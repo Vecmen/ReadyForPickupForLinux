@@ -8,63 +8,26 @@
 import Foundation
 
 struct NotificationSender {
-    
-    private let defaultsVendor = DefaultsVendor()
-    
+
+    /// Local Mac notification only (this app has no text/email service).
+    /// Sends when a preferred model (or custom SKU) is available.
+    func sendNotificationIfNeeded(availableParts: [(FulfillmentStore, [PartAvailability])], skuData: SKUData, search: SavedSearch) async {
+        guard search.notifyOnThisMac else { return }
+        let preferred = availableParts.flatMap { store, parts in
+            parts.filter { search.isPreferred($0) }.map { (store, $0) }
+        }
+        guard preferred.isEmpty == false else { return }
+
+        let summary = Dictionary(grouping: preferred, by: { $0.1.partName })
+            .map { "\($0.key): \($0.value.count) found" }
+            .sorted()
+            .joined(separator: ", ")
+        NotificationManager.shared.sendNotification(title: "Preferred Model Found!", body: summary)
+    }
+
+    // Legacy single-search entry point.
     func sendNotificationIfNeeded(availableParts: [(FulfillmentStore, [PartAvailability])], skuData: SKUData) async {
-        var hasPreferredModel = false
-        let preferredModels = defaultsVendor.preferredSKUs
-        for model in availableParts {
-            for submodel in model.1 {
-                if hasPreferredModel == false && preferredModels.contains(submodel.partNumber) {
-                    hasPreferredModel = true
-                    break
-                }
-                
-                if hasPreferredModel == false, let customSku = defaultsVendor.customSkuData?.sku, submodel.partNumber == customSku {
-                    hasPreferredModel = true
-                    break
-                }
-            }
-        }
-        
-        if defaultsVendor.notifyOnlyForPreferredModels && !hasPreferredModel {
-            return
-        }
-        
-        let message = self.generateNotificationText(from: availableParts, skuData: skuData, preferredModels: preferredModels)
-        NotificationManager.shared.sendNotification(title: hasPreferredModel ? "Preferred Model Found!" : "Apple Store Inventory", body: message)
+        let search = SearchStore.migrateLegacyPreferences()[0]
+        await sendNotificationIfNeeded(availableParts: availableParts, skuData: skuData, search: search)
     }
-    
-    private func generateNotificationText(from data: [(FulfillmentStore, [PartAvailability])], skuData: SKUData, preferredModels: Set<String>) -> String {
-        guard data.isEmpty == false else {
-            return "No Inventory Found"
-        }
-        
-        let customSkuData = defaultsVendor.customSkuData
-        let filterForPreferredModels = defaultsVendor.notifyOnlyForPreferredModels
-        
-        var collector: [PartAvailability: Int] = [:]
-        for (_, parts) in data {
-            for part in parts {
-                let collect = { collector[part, default: 0] += 1 }
-                
-                if part.partNumber == customSkuData?.sku {
-                    collect()
-                } else if filterForPreferredModels, preferredModels.contains(part.partNumber) {
-                    collect()
-                }
-            }
-        }
-        
-        let combined: [String] = collector.reduce(into: []) { partialResult, next in
-            
-            let (key, value) = next
-            let name = key.partName
-            partialResult.append("\(name): \(value) found")
-        }
-        
-        return combined.joined(separator: ", ")
-    }
-    
 }

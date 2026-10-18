@@ -16,7 +16,7 @@ struct InventoryWatchApp: App {
             ContentView()
                 .environmentObject(model)
         }
-        .windowStyle(HiddenTitleBarWindowStyle())
+        .defaultSize(width: 1280, height: 800)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button(action: {
