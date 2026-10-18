@@ -6,7 +6,7 @@ InventoryWatch — a macOS app that watches Apple Store pickup stock for current
 
 Grab the latest built app from the **[Releases page](https://github.com/wehbs/inventory-checker-app/releases)** — download the `.dmg`, open it, and drag InventoryWatch into Applications.
 
-> **Note:** current builds are **not notarized / not Developer ID-signed**, so on first launch macOS Gatekeeper will block a normal double-click. **Right-click (Control-click) the app → Open** to launch it the first time. A notarized build is planned once a Developer ID is enrolled.
+> **Note:** builds from v0.3.1 onward are Developer ID-signed and notarized by Apple, so they open with a normal double-click (earlier builds, e.g. v0.3.0, were unsigned for distribution and needed Privacy & Security -> Open Anyway on first launch).
 
 ## About this fork
 
