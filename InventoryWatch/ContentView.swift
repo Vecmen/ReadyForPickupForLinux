@@ -26,9 +26,6 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                Button { withAnimation { columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly } } label: {
-                    Image(systemName: "sidebar.leading")
-                }
                 Button { model.addSearch() } label: { Image(systemName: "plus") }
                     .help("Add a search")
             }
