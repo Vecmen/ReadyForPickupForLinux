@@ -18,6 +18,7 @@ struct SavedSearch: Codable, Identifiable, Equatable {
     var preferredSKUs: [String]
     var onlyPreferred: Bool
     var notifyOnThisMac: Bool
+    var notifyViaPushover: Bool
     var customSku: String
     var customSkuNickname: String
 
@@ -29,6 +30,7 @@ struct SavedSearch: Codable, Identifiable, Equatable {
          preferredSKUs: [String] = [],
          onlyPreferred: Bool = false,
          notifyOnThisMac: Bool = true,
+         notifyViaPushover: Bool = true,
          customSku: String = "",
          customSkuNickname: String = "") {
         self.id = id
@@ -39,8 +41,32 @@ struct SavedSearch: Codable, Identifiable, Equatable {
         self.preferredSKUs = preferredSKUs
         self.onlyPreferred = onlyPreferred
         self.notifyOnThisMac = notifyOnThisMac
+        self.notifyViaPushover = notifyViaPushover
         self.customSku = customSku
         self.customSkuNickname = customSkuNickname
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, productTypeRaw, storeNumber, storeName, includeNearby
+        case preferredSKUs, onlyPreferred, notifyOnThisMac, notifyViaPushover
+        case customSku, customSkuNickname
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        productTypeRaw = try c.decode(String.self, forKey: .productTypeRaw)
+        storeNumber = try c.decode(String.self, forKey: .storeNumber)
+        storeName = try c.decodeIfPresent(String.self, forKey: .storeName)
+        includeNearby = try c.decodeIfPresent(Bool.self, forKey: .includeNearby) ?? true
+        preferredSKUs = try c.decodeIfPresent([String].self, forKey: .preferredSKUs) ?? []
+        onlyPreferred = try c.decodeIfPresent(Bool.self, forKey: .onlyPreferred) ?? false
+        notifyOnThisMac = try c.decodeIfPresent(Bool.self, forKey: .notifyOnThisMac) ?? true
+        // Added after searches were already being saved; default on,
+        // actual sending is still gated by app-wide Pushover config.
+        notifyViaPushover = try c.decodeIfPresent(Bool.self, forKey: .notifyViaPushover) ?? true
+        customSku = try c.decodeIfPresent(String.self, forKey: .customSku) ?? ""
+        customSkuNickname = try c.decodeIfPresent(String.self, forKey: .customSkuNickname) ?? ""
     }
 
     /// Falls back to a current product if the saved type was retired.

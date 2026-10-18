@@ -29,6 +29,10 @@ final class ViewModel: ObservableObject {
     @Published var nextAutoRefreshAt: Date?
     @Published var throttledUntil: Date?
 
+    @Published var pushoverEnabled: Bool = PushoverSettings.isEnabled
+    @Published var pushoverConfigured: Bool = PushoverSettings.isConfigured
+    @Published var pushoverFeedback: String?
+
     private var autoRefreshTask: Task<Void, Never>?
     private var throttleFailureCount = 0
     private var lastNotifiedPreferredKeys: [UUID: Set<String>] = [:]
@@ -211,6 +215,30 @@ final class ViewModel: ObservableObject {
         print("[AutoRefresh] started, every \(autoRefreshIntervalMinutes) min")
     }
 
+    /// Re-reads Pushover config after Settings edits.
+    func refreshPushoverState() {
+        pushoverEnabled = PushoverSettings.isEnabled
+        pushoverConfigured = PushoverSettings.isConfigured
+    }
+
+    func setPushoverEnabled(_ enabled: Bool) {
+        PushoverSettings.isEnabled = enabled
+        refreshPushoverState()
+    }
+
+    /// Real test push from Settings. Honest success/failure feedback.
+    func sendTestPushover() async {
+        do {
+            try await PushoverClient.send(
+                title: "InventoryWatch test",
+                message: "This is a test notification from InventoryWatch on your Mac. Pushover is configured correctly.")
+            pushoverFeedback = "Test sent - check Pushover on your phone."
+        } catch {
+            pushoverFeedback = error.localizedDescription
+        }
+        refreshPushoverState()
+    }
+
     func stopAutoRefresh() {
         autoRefreshTask?.cancel()
         autoRefreshTask = nil
@@ -267,12 +295,11 @@ final class ViewModel: ObservableObject {
     }
 
     private func notifyIfNeeded(search: SavedSearch, parts: [(FulfillmentStore, [PartAvailability])]) {
-        guard search.notifyOnThisMac else { return }
-
-        // Dedup: only notify for preferred models that were NOT
-        // available at this store on the previous fetch. Unchanged
-        // auto-refresh cycles send nothing; a model that disappears
-        // and returns will notify again.
+        // Dedup FIRST (shared by both channels): only notify for
+        // preferred models that were NOT available at this store on
+        // the previous fetch. Unchanged auto-refresh cycles send
+        // nothing on either channel; a model that disappears and
+        // returns will notify again.
         func key(_ store: FulfillmentStore, _ part: PartAvailability) -> String {
             "\(store.storeNumber)|\(part.partNumber)"
         }
@@ -282,14 +309,32 @@ final class ViewModel: ObservableObject {
         lastNotifiedPreferredKeys[search.id] = currentKeys
 
         guard newKeys.isEmpty == false else { return }
-        guard let skuData = skuDataByProduct[search.productType] else { return }
 
         let newParts: [(FulfillmentStore, [PartAvailability])] = parts.compactMap { store, ps in
             let fresh = ps.filter { newKeys.contains(key(store, $0)) }
             return fresh.isEmpty ? nil : (store, fresh)
         }
-        Task {
-            await NotificationSender().sendNotificationIfNeeded(availableParts: newParts, skuData: skuData, search: search)
+
+        if search.notifyOnThisMac, let skuData = skuDataByProduct[search.productType] {
+            Task {
+                await NotificationSender().sendNotificationIfNeeded(availableParts: newParts, skuData: skuData, search: search)
+            }
+        }
+
+        // Pushover: per-search toggle + app-wide enable/keys. Single
+        // attempt per new-availability event, never a retry loop;
+        // failures are logged and surfaced, never crash the refresh.
+        if search.notifyViaPushover, PushoverSettings.isConfigured {
+            let alert = PushoverClient.stockMessage(for: search, parts: newParts)
+            Task {
+                do {
+                    try await PushoverClient.send(title: alert.title, message: alert.message)
+                    print("[Pushover] sent for search \(search.id)")
+                } catch {
+                    print("[Pushover] send failed: \(error.localizedDescription)")
+                    self.pushoverFeedback = "Pushover send failed: \(error.localizedDescription)"
+                }
+            }
         }
     }
 

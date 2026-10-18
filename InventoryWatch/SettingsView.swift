@@ -14,6 +14,9 @@ struct SettingsView: View {
     @AppStorage("preferredCountry") private var preferredCountry = "US"
     @AppStorage("useLargeText") private var useLargeText: Bool = false
     @AppStorage("preferredUpdateInterval") private var preferredUpdateInterval: Int = 5
+    @State private var pushoverUserKey: String = PushoverSettings.userKey
+    @State private var pushoverApiToken: String = PushoverSettings.apiToken
+    @State private var isSendingTest = false
 
     var body: some View {
         Form {
@@ -43,6 +46,40 @@ struct SettingsView: View {
                 .font(.caption).foregroundColor(.secondary)
 
             Toggle("Use larger text sizes", isOn: $useLargeText)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Pushover (push to your phone)").font(.headline)
+                Text("Pushover requires your own account and app token: install Pushover on your iPhone, register an application at pushover.net/apps, then paste your User Key and that app's API Token below. Keys are stored in your Mac's Keychain, never in the app.")
+                    .font(.caption).foregroundColor(.secondary)
+
+                Toggle("Enable Pushover notifications", isOn: Binding(
+                    get: { model.pushoverEnabled },
+                    set: { model.setPushoverEnabled($0) }))
+
+                SecureField("Pushover User Key", text: $pushoverUserKey)
+                    .onChange(of: pushoverUserKey) { PushoverSettings.userKey = $0; model.refreshPushoverState() }
+                SecureField("Application API Token", text: $pushoverApiToken)
+                    .onChange(of: pushoverApiToken) { PushoverSettings.apiToken = $0; model.refreshPushoverState() }
+
+                HStack {
+                    Button("Send test notification") {
+                        isSendingTest = true
+                        Task { await model.sendTestPushover(); isSendingTest = false }
+                    }
+                    .disabled(isSendingTest || pushoverUserKey.isEmpty || pushoverApiToken.isEmpty)
+                    if isSendingTest { ProgressView().controlSize(.small) }
+                }
+                if pushoverUserKey.isEmpty || pushoverApiToken.isEmpty {
+                    Text("Enter both keys to enable the test button. With invalid keys, Pushover's own error is shown here.")
+                        .font(.caption).foregroundColor(.secondary)
+                }
+                if let feedback = model.pushoverFeedback {
+                    Text(feedback).font(.caption)
+                        .foregroundColor(feedback.hasPrefix("Test sent") ? .green : .red)
+                }
+            }
         }
         .padding(20)
         .frame(width: 420)

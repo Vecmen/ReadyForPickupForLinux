@@ -234,7 +234,10 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Notifications").font(.headline)
                             Toggle("Send inventory notifications on this Mac", isOn: notifyBinding)
-                            Text("Notifications are sent on this Mac only when a preferred model is found.")
+                            Toggle("Send Pushover notifications", isOn: pushoverBinding)
+                            Text(model.pushoverConfigured
+                                 ? "Notifications are sent when a preferred model is newly found. Pushover is configured in Settings."
+                                 : "Pushover is not configured yet - add your keys in Settings (Cmd-,) to get phone notifications. Each user needs their own Pushover app token.")
                                 .font(.caption).foregroundColor(.secondary)
                         }
                     }
@@ -248,22 +251,27 @@ struct ContentView: View {
     }
 
     private func banner(for search: SavedSearch) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: search.notifyOnThisMac ? "checkmark.circle.fill" : "bell.badge")
-                .foregroundColor(search.notifyOnThisMac ? .green : .secondary)
+        // Only claim channels that are actually active for this search.
+        let macOn = search.notifyOnThisMac
+        let pushoverOn = search.notifyViaPushover && model.pushoverConfigured
+        let channels: String = [macOn ? "on this Mac" : nil, pushoverOn ? "via Pushover" : nil]
+            .compactMap { $0 }.joined(separator: " and ")
+        return HStack(alignment: .top, spacing: 10) {
+            Image(systemName: channels.isEmpty == false ? "checkmark.circle.fill" : "bell.badge")
+                .foregroundColor(channels.isEmpty == false ? .green : .secondary)
                 .font(.title2)
             VStack(alignment: .leading, spacing: 2) {
-                Text(search.notifyOnThisMac ? "Search configured successfully" : "Search saved")
+                Text(channels.isEmpty == false ? "Search configured successfully" : "Search saved")
                     .font(.headline)
-                Text(search.notifyOnThisMac
-                     ? "You will receive notifications on this Mac when preferred models are found."
-                     : "Turn on notifications on this Mac to be alerted when preferred models are found.")
+                Text(channels.isEmpty == false
+                     ? "You will receive notifications \(channels) when preferred models are found."
+                     : "Turn on notifications on this Mac or via Pushover to be alerted when preferred models are found.")
                     .font(.caption).foregroundColor(.secondary)
             }
             Spacer()
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.green.opacity(search.notifyOnThisMac ? 0.10 : 0.04)))
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.green.opacity((search.notifyOnThisMac || (search.notifyViaPushover && model.pushoverConfigured)) ? 0.10 : 0.04)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15)))
     }
 
@@ -346,6 +354,11 @@ struct ContentView: View {
     private var nearbyBinding: Binding<Bool> {
         Binding(get: { model.selectedSearch?.includeNearby ?? true },
                 set: { value in model.updateSelected { $0.includeNearby = value }; Task { await model.fetchSelected() } })
+    }
+
+    private var pushoverBinding: Binding<Bool> {
+        Binding(get: { model.selectedSearch?.notifyViaPushover ?? true },
+                set: { value in model.updateSelected { $0.notifyViaPushover = value } })
     }
 
     private var notifyBinding: Binding<Bool> {
