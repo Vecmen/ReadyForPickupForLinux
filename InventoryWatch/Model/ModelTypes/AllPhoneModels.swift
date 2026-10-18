@@ -12,22 +12,22 @@ struct AllPhoneModels {
         let sku: String
         let productName: String
     }
-    
-    var proMax14: [PhoneModel]
-    var pro14: [PhoneModel]
-    var regular14: [PhoneModel]
-    var plus14: [PhoneModel]
-    
-    var mini13: [PhoneModel]
-    var regular13: [PhoneModel]
-    
+
+    var iphone16: [PhoneModel] = []
+    var iphone17: [PhoneModel] = []
+    var iphone17e: [PhoneModel] = []
+    var iphoneAir: [PhoneModel] = []
+    var iphoneDuo: [PhoneModel] = []
+    var pro18: [PhoneModel] = []
+    var proMax18: [PhoneModel] = []
+
     func toSkuData(_ keypath: KeyPath<AllPhoneModels, [AllPhoneModels.PhoneModel]>) -> SKUData {
         let models = self[keyPath: keypath]
-        
+
         let lookup: [String: String] = models.reduce(into: [:]) { acc, next in
             acc[next.sku] = next.productName
         }
-        
+
         return SKUData(orderedSKUs: models.map { $0.sku }, lookup: lookup)
     }
 }

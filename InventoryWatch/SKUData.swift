@@ -10,346 +10,289 @@ import Foundation
 struct SKUData {
     private let skuLookup: [String: String]
     let orderedSKUs: [String]
-    
+
     init(orderedSKUs: [String], lookup: [String: String]) {
         self.orderedSKUs = orderedSKUs
         self.skuLookup = lookup
     }
-    
+
     func productName(forSKU sku: String) -> String? {
         return skuLookup[sku]
     }
 }
 
-func iPadProM2_11inDataForCountry(_ country: Country, isWifi: Bool) -> SKUData {
-    let skuCode = country.skuCode(for: isWifi ? .iPadProM2_11in_Wifi : .iPadProM2_11in_Cellular) ?? country.skuCode
-    
-    let cellData = [
-        "MP563": "M2 iPad Pro 11in 128GB Silver Cellular",
-        "MP583": "M2 iPad Pro 11in 256GB Silver Cellular",
-        "MP5D3": "M2 iPad Pro 11in 512GB Silver Cellular",
-        "MP5F3": "M2 iPad Pro 11in 1TB Silver Cellular",
-        "MP5H3": "M2 iPad Pro 11in 2TB Silver Cellular",
-        "MP553": "M2 iPad Pro 11in 128GB Space Gray Cellular",
-        "MP573": "M2 iPad Pro 11in 256GB Space Gray Cellular",
-        "MP593": "M2 iPad Pro 11in 512GB Space Gray Cellular",
-        "MP5E3": "M2 iPad Pro 11in 1TB Space Gray Cellular",
-        "MP5G3": "M2 iPad Pro 11in 2TB Space Gray Cellular"
-    ]
-    
-    let wifiData = [
-        "MNXE3": "M2 iPad Pro 11in 128GB Silver Wifi",
-        "MNXG3": "M2 iPad Pro 11in 256GB Silver Wifi",
-        "MNXJ3": "M2 iPad Pro 11in 512GB Silver Wifi",
-        "MNXL3": "M2 iPad Pro 11in 1TB Silver Wifi",
-        "MNXN3": "M2 iPad Pro 11in 2TB Silver Wifi",
-        "MNXD3": "M2 iPad Pro 11in 128GB Space Gray Wifi",
-        "MNXF3": "M2 iPad Pro 11in 256GB Space Gray Wifi",
-        "MNXH3": "M2 iPad Pro 11in 512GB Space Gray Wifi",
-        "MNXK3": "M2 iPad Pro 11in 1TB Space Gray Wifi",
-        "MNXM3": "M2 iPad Pro 11in 2TB Space Gray Wifi"
-    ]
-    
-    let orderedSkus = isWifi ?
-    ["MNXE3", "MNXG3", "MNXJ3", "MNXL3", "MNXN3", "MNXD3", "MNXF3", "MNXH3", "MNXK3", "MNXM3"] :
-    ["MNXE3", "MNXG3", "MNXJ3", "MNXL3", "MNXN3", "MNXD3", "MNXF3", "MNXH3", "MNXK3", "MNXM3"]
-    
-    let skusToName: [String: String] = orderedSkus.reduce(into: [String: String]()) { partialResult, next in
-        let map = isWifi ? wifiData : cellData
-        guard let name = map[next] else { return }
-        
-        let localSku = "\(next)\(skuCode)/A"
-        partialResult[localSku] = name
-    }
-    
-    let localOrderedSkus = orderedSkus.map { "\($0)\(skuCode)/A" }
-    
-    return SKUData(orderedSKUs: localOrderedSkus, lookup: skusToName)
-}
+// Mac SKU data: EVERY standard/retail configuration Apple lists on the
+// US buy pages (product-selection configs), verified 2026-10-18 both on
+// the buy-page config page (schema.org offers.sku / partNumber, with the
+// full chip/RAM/storage spec in the config URL & details text) and via
+// the live pickup-message API (real storePickupProductTitle for every
+// SKU; 61 available / 30 ineligible at the first returned NY store).
+// Display names are built from that buy-page spec text - RAM/storage
+// are tied to the exact part number by Apple's own config page.
+// Build-to-order combos beyond these standard configs (configurator
+// memory/storage ranges) expose no part number on the buy pages and
+// are NOT included - they have no store-pickup SKU to watch.
+// Non-US suffixes follow the historic Mac pattern
+// (<base><country.skuCode>/A) and are NOT verified (US is the focus).
 
-func iPadProM2_13inDataForCountry(_ country: Country, isWifi: Bool) -> SKUData {
-    let skuCode = country.skuCode(for: isWifi ? .iPadProM2_13in_Wifi : .iPadProM2_13in_Cellular) ?? country.skuCode
-    
-    let cellData = [
-        "MP5Y3": "M2 iPad Pro 12.9in 128GB Silver Cellular",
-        "MP613": "M2 iPad Pro 12.9in 256GB Silver Cellular",
-        "MP633": "M2 iPad Pro 12.9in 512GB Silver Cellular",
-        "MP653": "M2 iPad Pro 12.9in 1TB Silver Cellular",
-        "MP673": "M2 iPad Pro 12.9in 2TB Silver Cellular",
-        "MP5X3": "M2 iPad Pro 12.9in 128GB Space Gray Cellular",
-        "MP603": "M2 iPad Pro 12.9in 256GB Space Gray Cellular",
-        "MP623": "M2 iPad Pro 12.9in 512GB Space Gray Cellular",
-        "MP643": "M2 iPad Pro 12.9in 1TB Space Gray Cellular",
-        "MP663": "M2 iPad Pro 12.9in 2TB Space Gray Cellular"
-    ]
-    
-    let wifiData = [
-        "MNXQ3": "M2 iPad Pro 12.9in 128GB Silver Wifi",
-        "MNXT3": "M2 iPad Pro 12.9in 256GB Silver Wifi",
-        "MNXV3": "M2 iPad Pro 12.9in 512GB Silver Wifi",
-        "MNXX3": "M2 iPad Pro 12.9in 1TB Silver Wifi",
-        "MNY03": "M2 iPad Pro 12.9in 2TB Silver Wifi",
-        "MNXP3": "M2 iPad Pro 12.9in 128GB Space Gray Wifi",
-        "MNXR3": "M2 iPad Pro 12.9in 256GB Space Gray Wifi",
-        "MNXU3": "M2 iPad Pro 12.9in 512GB Space Gray Wifi",
-        "MNXW3": "M2 iPad Pro 12.9in 1TB Space Gray Wifi",
-        "MNXY3": "M2 iPad Pro 12.9in 2TB Space Gray Wifi"
-    ]
-    
-    let orderedSkus = isWifi ?
-    ["MNXQ3", "MNXT3", "MNXV3", "MNXX3", "MNY03", "MNXP3", "MNXR3", "MNXU3", "MNXW3", "MNXY3"] :
-    ["MP5Y3", "MP613", "MP633", "MP653", "MP673", "MP5X3", "MP603", "MP623", "MP643", "MP663"]
-    
-    let skusToName: [String: String] = orderedSkus.reduce(into: [String: String]()) { partialResult, next in
-        let map = isWifi ? wifiData : cellData
-        guard let name = map[next] else { return }
-        
-        let localSku = "\(next)\(skuCode)/A"
-        partialResult[localSku] = name
-    }
-    
-    let localOrderedSkus = orderedSkus.map { "\($0)\(skuCode)/A" }
-    
-    return SKUData(orderedSKUs: localOrderedSkus, lookup: skusToName)
-}
-
-func iPad10thGenDataForCountry(_ country: Country, isWifi: Bool) -> SKUData {
-    let skuCode = country.skuCode(for: isWifi ? .iPad10thGenWifi : .iPad10thGenCellular) ?? country.skuCode
-    
-    let wifiData = [
-        "MPQ13": "iPad (10th Gen) 64GB Blue Wifi",
-        "MPQ93": "iPad (10th Gen) 256GB Blue Wifi",
-        "MPQ33": "iPad (10th Gen) 64GB Pink Wifi",
-        "MPQC3": "iPad (10th Gen) 256GB Pink Wifi",
-        "MPQ03": "iPad (10th Gen) 64GB Silver Wifi",
-        "MPQ83": "iPad (10th Gen) 256GB Silver Wifi",
-        "MPQ23": "iPad (10th Gen) 64GB Yellow Wifi",
-        "MPQA3": "iPad (10th Gen) 256GB Yellow Wifi"
-    ]
-    
-    let cellData = [
-        "MQ6K3": "iPad (10th Gen) 64GB Blue Cellular",
-        "MQ6U3": "iPad (10th Gen) 256GB Blue Cellular",
-        "MQ6M3": "iPad (10th Gen) 64GB Pink Cellular",
-        "MQ6W3": "iPad (10th Gen) 256GB Pink Cellular",
-        "MQ6J3": "iPad (10th Gen) 64GB Silver Cellular",
-        "MQ6T3": "iPad (10th Gen) 256GB Silver Cellular",
-        "MQ6L3": "iPad (10th Gen) 64GB Yellow Cellular",
-        "MQ6V3": "iPad (10th Gen) 256GB Yellow Cellular"
-    ]
-    
-    let orderedSkus = isWifi ?
-    ["MPQ13", "MPQ93", "MPQ33", "MPQC3", "MPQ03", "MPQ83", "MPQ23", "MPQA3"] :
-    ["MQ6K3", "MQ6U3", "MQ6M3", "MQ6W3", "MQ6J3", "MQ6T3", "MQ6L3", "MQ6V3"]
-    
-    let skusToName: [String: String] = orderedSkus.reduce(into: [String: String]()) { partialResult, next in
-        let map = isWifi ? wifiData : cellData
-        guard let name = map[next] else { return }
-        
-        let localSku = "\(next)\(skuCode)/A"
-        partialResult[localSku] = name
-    }
-    
-    let localOrderedSkus = orderedSkus.map { "\($0)\(skuCode)/A" }
-    
-    return SKUData(orderedSKUs: localOrderedSkus, lookup: skusToName)
-}
-
-func iPadMiniDataForCountry(_ country: Country, isWifi: Bool) -> SKUData {
-    let skuCode = country.skuCode(for: isWifi ? .iPadMiniWifi : .iPadMiniCellular) ?? country.skuCode
-    
-    let wifiData = [
-        "MK7R3": "iPad Mini 64GB Purple Wifi",
-        "MLWL3": "iPad Mini 64GB Pink Wifi",
-        "MK7P3": "iPad Mini 64GB Starlight Wifi",
-        "MK7M3": "iPad Mini 64GB Space Gray Wifi",
-        "MK7X3": "iPad Mini 256GB Purple Wifi",
-        "MLWR3": "iPad Mini 256GB Pink Wifi",
-        "MK7V3": "iPad Mini 256GB Starlight Wifi",
-        "MK7T3": "iPad Mini 256GB Space Gray Wifi"
-    ]
-    
-    let cellData = [
-        "MK8E3": "iPad Mini 64GB Purple Cellular",
-        "MLX43": "iPad Mini 64GB Pink Cellular",
-        "MK8C3": "iPad Mini 64GB Starlight Cellular",
-        "MK893": "iPad Mini 64GB Space Gray Cellular",
-        "MK8K3": "iPad Mini 256GB Purple Cellular",
-        "MLX93": "iPad Mini 256GB Pink Cellular",
-        "MK8H3": "iPad Mini 256GB Starlight Cellular",
-        "MK8F3": "iPad Mini 256GB Space Gray Cellular"
-    ]
-    
-    let orderedSkus = isWifi ?
-    [ "MK7R3", "MLWL3", "MK7P3", "MK7M3", "MK7X3", "MLWR3", "MK7V3", "MK7T3" ] :
-    [ "MK8E3", "MLX43", "MK8C3", "MK893", "MK8K3", "MLX93", "MK8H3", "MK8F3" ]
-    
-    let skusToName: [String: String] = orderedSkus.reduce(into: [String: String]()) { partialResult, next in
-        let map = isWifi ? wifiData : cellData
-        guard let name = map[next] else { return }
-        
-        let localSku = "\(next)\(skuCode)/A"
-        partialResult[localSku] = name
-    }
-    
-    let localOrderedSkus = orderedSkus.map { "\($0)\(skuCode)/A" }
-    
-    return SKUData(orderedSKUs: localOrderedSkus, lookup: skusToName)
-}
-
-func StudioDisplayForCountry(_ country: Country) -> SKUData {
-    let skuCode = country.skuCode(for: .StudioDisplay) ?? country.skuCode
-    
+func MacBookNeoDataForCountry(_ country: Country) -> SKUData {
     let orderedSkus = [
-        "MK0U3\(skuCode)/A",
-        "MK0Q3\(skuCode)/A",
-        "MMYQ3\(skuCode)/A",
-        "MMYW3\(skuCode)/A",
-        "MMYV3\(skuCode)/A",
-        "MMYX3\(skuCode)/A"
+        "MHFH4\(country.skuCode)/A",
+        "MHFD4\(country.skuCode)/A",
+        "MHFG4\(country.skuCode)/A",
+        "MHFJ4\(country.skuCode)/A",
+        "MHFA4\(country.skuCode)/A",
+        "MHFF4\(country.skuCode)/A",
+        "MHFE4\(country.skuCode)/A",
+        "MHFC4\(country.skuCode)/A"
     ]
-    
+
     let skusToName = [
-        "MK0U3\(skuCode)/A": "Studio Display - Standard glass - Tilt-adjustable stand",
-        "MK0Q3\(skuCode)/A": "Studio Display - Standard glass - Tilt- and height-adjustable stand",
-        "MMYQ3\(skuCode)/A": "Studio Display - Standard glass - VESA mount adapter",
-        "MMYW3\(skuCode)/A": "Studio Display - Nano-texture glass - Tilt-adjustable stand",
-        "MMYV3\(skuCode)/A": "Studio Display - Nano-texture glass - Tilt- and height-adjustable stand",
-        "MMYX3\(skuCode)/A": "Studio Display - Nano-texture glass - VESA mount adapter"
+        "MHFH4\(country.skuCode)/A": "MacBook Neo 13in Blush 256GB",
+        "MHFD4\(country.skuCode)/A": "MacBook Neo 13in Citrus 256GB",
+        "MHFG4\(country.skuCode)/A": "MacBook Neo 13in Indigo 512GB",
+        "MHFJ4\(country.skuCode)/A": "MacBook Neo 13in Blush 512GB",
+        "MHFA4\(country.skuCode)/A": "MacBook Neo 13in Silver 256GB",
+        "MHFF4\(country.skuCode)/A": "MacBook Neo 13in Indigo 256GB",
+        "MHFE4\(country.skuCode)/A": "MacBook Neo 13in Citrus 512GB",
+        "MHFC4\(country.skuCode)/A": "MacBook Neo 13in Silver 512GB"
     ]
-    
+
+    return SKUData(orderedSKUs: orderedSkus, lookup: skusToName)
+}
+
+func M5MacBookAir13DataForCountry(_ country: Country) -> SKUData {
+    let orderedSkus = [
+        "MDHC4\(country.skuCode)/A",
+        "MGP94\(country.skuCode)/A",
+        "MGP74\(country.skuCode)/A",
+        "MGP84\(country.skuCode)/A",
+        "MDH74\(country.skuCode)/A",
+        "MDHF4\(country.skuCode)/A",
+        "MDHG4\(country.skuCode)/A",
+        "MDHD4\(country.skuCode)/A",
+        "MDH94\(country.skuCode)/A",
+        "MDHA4\(country.skuCode)/A",
+        "MDHJ4\(country.skuCode)/A",
+        "MDHE4\(country.skuCode)/A",
+        "MDHH4\(country.skuCode)/A",
+        "MDHK4\(country.skuCode)/A",
+        "MDH84\(country.skuCode)/A"
+    ]
+
+    let skusToName = [
+        "MDHC4\(country.skuCode)/A": "M5 MacBook Air 13in Starlight 16GB 1TB",
+        "MGP94\(country.skuCode)/A": "M5 MacBook Air 13in Sky Blue 24GB 512GB",
+        "MGP74\(country.skuCode)/A": "M5 MacBook Air 13in Starlight 24GB 512GB",
+        "MGP84\(country.skuCode)/A": "M5 MacBook Air 13in Midnight 24GB 512GB",
+        "MDH74\(country.skuCode)/A": "M5 MacBook Air 13in Silver 16GB 512GB",
+        "MDHF4\(country.skuCode)/A": "M5 MacBook Air 13in Midnight 16GB 1TB",
+        "MDHG4\(country.skuCode)/A": "M5 MacBook Air 13in Midnight 24GB 1TB",
+        "MDHD4\(country.skuCode)/A": "M5 MacBook Air 13in Starlight 24GB 1TB",
+        "MDH94\(country.skuCode)/A": "M5 MacBook Air 13in Silver 24GB 1TB",
+        "MDHA4\(country.skuCode)/A": "M5 MacBook Air 13in Starlight 16GB 512GB",
+        "MDHJ4\(country.skuCode)/A": "M5 MacBook Air 13in Sky Blue 16GB 1TB",
+        "MDHE4\(country.skuCode)/A": "M5 MacBook Air 13in Midnight 16GB 512GB",
+        "MDHH4\(country.skuCode)/A": "M5 MacBook Air 13in Sky Blue 16GB 512GB",
+        "MDHK4\(country.skuCode)/A": "M5 MacBook Air 13in Sky Blue 24GB 1TB",
+        "MDH84\(country.skuCode)/A": "M5 MacBook Air 13in Silver 16GB 1TB"
+    ]
+
+    return SKUData(orderedSKUs: orderedSkus, lookup: skusToName)
+}
+
+func M5MacBookAir15DataForCountry(_ country: Country) -> SKUData {
+    let orderedSkus = [
+        "MGPC4\(country.skuCode)/A",
+        "MDVF4\(country.skuCode)/A",
+        "MDVK4\(country.skuCode)/A",
+        "MDVE4\(country.skuCode)/A",
+        "MGPD4\(country.skuCode)/A",
+        "MDV94\(country.skuCode)/A",
+        "MDVD4\(country.skuCode)/A",
+        "MDVN4\(country.skuCode)/A",
+        "MDVH4\(country.skuCode)/A",
+        "MDVU4\(country.skuCode)/A",
+        "MDVT4\(country.skuCode)/A",
+        "MDVA4\(country.skuCode)/A",
+        "MDVC4\(country.skuCode)/A",
+        "MGPE4\(country.skuCode)/A",
+        "MDVQ4\(country.skuCode)/A"
+    ]
+
+    let skusToName = [
+        "MGPC4\(country.skuCode)/A": "M5 MacBook Air 15in Starlight 24GB 512GB",
+        "MDVF4\(country.skuCode)/A": "M5 MacBook Air 15in Starlight 24GB 1TB",
+        "MDVK4\(country.skuCode)/A": "M5 MacBook Air 15in Midnight 16GB 1TB",
+        "MDVE4\(country.skuCode)/A": "M5 MacBook Air 15in Starlight 16GB 1TB",
+        "MGPD4\(country.skuCode)/A": "M5 MacBook Air 15in Midnight 24GB 512GB",
+        "MDV94\(country.skuCode)/A": "M5 MacBook Air 15in Silver 16GB 512GB",
+        "MDVD4\(country.skuCode)/A": "M5 MacBook Air 15in Starlight 16GB 512GB",
+        "MDVN4\(country.skuCode)/A": "M5 MacBook Air 15in Midnight 24GB 1TB",
+        "MDVH4\(country.skuCode)/A": "M5 MacBook Air 15in Midnight 16GB 512GB",
+        "MDVU4\(country.skuCode)/A": "M5 MacBook Air 15in Sky Blue 24GB 1TB",
+        "MDVT4\(country.skuCode)/A": "M5 MacBook Air 15in Sky Blue 16GB 1TB",
+        "MDVA4\(country.skuCode)/A": "M5 MacBook Air 15in Silver 16GB 1TB",
+        "MDVC4\(country.skuCode)/A": "M5 MacBook Air 15in Silver 24GB 1TB",
+        "MGPE4\(country.skuCode)/A": "M5 MacBook Air 15in Sky Blue 24GB 512GB",
+        "MDVQ4\(country.skuCode)/A": "M5 MacBook Air 15in Sky Blue 16GB 512GB"
+    ]
+
+    return SKUData(orderedSKUs: orderedSkus, lookup: skusToName)
+}
+
+func MacBookPro14DataForCountry(_ country: Country) -> SKUData {
+    let orderedSkus = [
+        "MGDU4\(country.skuCode)/A",
+        "MGDT4\(country.skuCode)/A",
+        "MDE34\(country.skuCode)/A",
+        "MGXX4\(country.skuCode)/A",
+        "MGDQ4\(country.skuCode)/A",
+        "MDE14\(country.skuCode)/A",
+        "MGDN4\(country.skuCode)/A",
+        "MEQJ4\(country.skuCode)/A",
+        "MDE54\(country.skuCode)/A",
+        "MJLW4\(country.skuCode)/A",
+        "MJ3D4\(country.skuCode)/A",
+        "MDE64\(country.skuCode)/A",
+        "MJ3E4\(country.skuCode)/A",
+        "MGDP4\(country.skuCode)/A",
+        "MJLV4\(country.skuCode)/A",
+        "MGDR4\(country.skuCode)/A"
+    ]
+
+    let skusToName = [
+        "MGDU4\(country.skuCode)/A": "MacBook Pro 14in M5 Max (18c/32c) Space Black 36GB 2TB",
+        "MGDT4\(country.skuCode)/A": "MacBook Pro 14in M5 Pro (18c/20c) Space Black 24GB 2TB",
+        "MDE34\(country.skuCode)/A": "MacBook Pro 14in M5 (10c/10c) Space Black 24GB 1TB",
+        "MGXX4\(country.skuCode)/A": "MacBook Pro 14in M5 Pro (18c/20c) Space Black Nano-texture 48GB 2TB",
+        "MGDQ4\(country.skuCode)/A": "MacBook Pro 14in M5 Max (18c/32c) Silver 36GB 2TB",
+        "MDE14\(country.skuCode)/A": "MacBook Pro 14in M5 (10c/10c) Space Black 16GB 1TB",
+        "MGDN4\(country.skuCode)/A": "MacBook Pro 14in M5 Pro (15c/16c) Silver 24GB 1TB",
+        "MEQJ4\(country.skuCode)/A": "MacBook Pro 14in M5 (10c/10c) Space Black Nano-texture 16GB 1TB",
+        "MDE54\(country.skuCode)/A": "MacBook Pro 14in M5 (10c/10c) Silver 16GB 1TB",
+        "MJLW4\(country.skuCode)/A": "MacBook Pro 14in M5 Pro (15c/16c) Space Black 24GB 2TB",
+        "MJ3D4\(country.skuCode)/A": "MacBook Pro 14in M5 (10c/10c) Space Black 32GB 1TB",
+        "MDE64\(country.skuCode)/A": "MacBook Pro 14in M5 (10c/10c) Silver 24GB 1TB",
+        "MJ3E4\(country.skuCode)/A": "MacBook Pro 14in M5 (10c/10c) Silver 32GB 1TB",
+        "MGDP4\(country.skuCode)/A": "MacBook Pro 14in M5 Pro (18c/20c) Silver 24GB 2TB",
+        "MJLV4\(country.skuCode)/A": "MacBook Pro 14in M5 Pro (15c/16c) Silver 24GB 2TB",
+        "MGDR4\(country.skuCode)/A": "MacBook Pro 14in M5 Pro (15c/16c) Space Black 24GB 1TB"
+    ]
+
+    return SKUData(orderedSKUs: orderedSkus, lookup: skusToName)
+}
+
+func MacBookPro16DataForCountry(_ country: Country) -> SKUData {
+    let orderedSkus = [
+        "MGEC4\(country.skuCode)/A",
+        "MGEE4\(country.skuCode)/A",
+        "MGE94\(country.skuCode)/A",
+        "MGE74\(country.skuCode)/A",
+        "MGE64\(country.skuCode)/A",
+        "MGE44\(country.skuCode)/A",
+        "MGED4\(country.skuCode)/A",
+        "MGEA4\(country.skuCode)/A"
+    ]
+
+    let skusToName = [
+        "MGEC4\(country.skuCode)/A": "MacBook Pro 16in M5 Pro (18c/20c) Space Black 48GB 1TB",
+        "MGEE4\(country.skuCode)/A": "MacBook Pro 16in M5 Max (18c/40c) Space Black 48GB 2TB",
+        "MGE94\(country.skuCode)/A": "MacBook Pro 16in M5 Max (18c/40c) Silver 48GB 2TB",
+        "MGE74\(country.skuCode)/A": "MacBook Pro 16in M5 Max (18c/32c) Silver 36GB 2TB",
+        "MGE64\(country.skuCode)/A": "MacBook Pro 16in M5 Pro (18c/20c) Silver 48GB 1TB",
+        "MGE44\(country.skuCode)/A": "MacBook Pro 16in M5 Pro (18c/20c) Silver 24GB 1TB",
+        "MGED4\(country.skuCode)/A": "MacBook Pro 16in M5 Max (18c/32c) Space Black 36GB 2TB",
+        "MGEA4\(country.skuCode)/A": "MacBook Pro 16in M5 Pro (18c/20c) Space Black 24GB 1TB"
+    ]
+
+    return SKUData(orderedSKUs: orderedSkus, lookup: skusToName)
+}
+
+func iMacDataForCountry(_ country: Country) -> SKUData {
+    let orderedSkus = [
+        "MD2T4\(country.skuCode)/A",
+        "MD2U4\(country.skuCode)/A",
+        "MD3H4\(country.skuCode)/A",
+        "MWUG3\(country.skuCode)/A",
+        "MWV83\(country.skuCode)/A",
+        "MD2Q4\(country.skuCode)/A",
+        "MWUV3\(country.skuCode)/A",
+        "MWV03\(country.skuCode)/A",
+        "MWUY3\(country.skuCode)/A",
+        "MWUF3\(country.skuCode)/A",
+        "MWUC3\(country.skuCode)/A",
+        "MWV53\(country.skuCode)/A",
+        "MWUE3\(country.skuCode)/A",
+        "MWUU3\(country.skuCode)/A",
+        "MWV13\(country.skuCode)/A",
+        "MWV33\(country.skuCode)/A",
+        "MWV63\(country.skuCode)/A",
+        "MWV43\(country.skuCode)/A",
+        "MWUW3\(country.skuCode)/A",
+        "MCR24\(country.skuCode)/A"
+    ]
+
+    let skusToName = [
+        "MD2T4\(country.skuCode)/A": "iMac M4 (10c/10c) Blue 24GB 512GB",
+        "MD2U4\(country.skuCode)/A": "iMac M4 (10c/10c) Pink 24GB 512GB",
+        "MD3H4\(country.skuCode)/A": "iMac M4 (10c/10c) Silver Nano-texture 16GB 256GB",
+        "MWUG3\(country.skuCode)/A": "iMac M4 (8c/8c) Pink 16GB 256GB",
+        "MWV83\(country.skuCode)/A": "iMac M4 (10c/10c) Orange 16GB 256GB",
+        "MD2Q4\(country.skuCode)/A": "iMac M4 (10c/10c) Green 24GB 512GB",
+        "MWUV3\(country.skuCode)/A": "iMac M4 (10c/10c) Silver 16GB 512GB",
+        "MWV03\(country.skuCode)/A": "iMac M4 (10c/10c) Green 16GB 512GB",
+        "MWUY3\(country.skuCode)/A": "iMac M4 (10c/10c) Green 16GB 256GB",
+        "MWUF3\(country.skuCode)/A": "iMac M4 (8c/8c) Blue 16GB 256GB",
+        "MWUC3\(country.skuCode)/A": "iMac M4 (8c/8c) Silver 16GB 256GB",
+        "MWV53\(country.skuCode)/A": "iMac M4 (10c/10c) Pink 16GB 512GB",
+        "MWUE3\(country.skuCode)/A": "iMac M4 (8c/8c) Green 16GB 256GB",
+        "MWUU3\(country.skuCode)/A": "iMac M4 (10c/10c) Silver 16GB 256GB",
+        "MWV13\(country.skuCode)/A": "iMac M4 (10c/10c) Blue 16GB 256GB",
+        "MWV33\(country.skuCode)/A": "iMac M4 (10c/10c) Blue 16GB 512GB",
+        "MWV63\(country.skuCode)/A": "iMac M4 (10c/10c) Purple 16GB 256GB",
+        "MWV43\(country.skuCode)/A": "iMac M4 (10c/10c) Pink 16GB 256GB",
+        "MWUW3\(country.skuCode)/A": "iMac M4 (10c/10c) Yellow 16GB 256GB",
+        "MCR24\(country.skuCode)/A": "iMac M4 (10c/10c) Silver 24GB 512GB"
+    ]
+
+    return SKUData(orderedSKUs: orderedSkus, lookup: skusToName)
+}
+
+func MacMiniDataForCountry(_ country: Country) -> SKUData {
+    let orderedSkus = [
+        "MHQM4\(country.skuCode)/A",
+        "MHQL4\(country.skuCode)/A",
+        "MHQK4\(country.skuCode)/A",
+        "MHQV4\(country.skuCode)/A",
+        "MHQU4\(country.skuCode)/A",
+        "MHQN4\(country.skuCode)/A"
+    ]
+
+    let skusToName = [
+        "MHQM4\(country.skuCode)/A": "Mac mini M6 (12c/12c) 24GB 512GB",
+        "MHQL4\(country.skuCode)/A": "Mac mini M6 (12c/12c) 16GB 512GB",
+        "MHQK4\(country.skuCode)/A": "Mac mini M6 (12c/12c) 16GB 256GB",
+        "MHQV4\(country.skuCode)/A": "Mac mini M6 (12c/12c) 32GB 1TB",
+        "MHQU4\(country.skuCode)/A": "Mac mini M5 Pro (18c/20c) 64GB 1TB",
+        "MHQN4\(country.skuCode)/A": "Mac mini M5 Pro (15c/16c) 24GB 512GB"
+    ]
+
     return SKUData(orderedSKUs: orderedSkus, lookup: skusToName)
 }
 
 func MacStudioDataForCountry(_ country: Country) -> SKUData {
-    let skuCode = country.skuCode(for: .MacStudio) ?? country.skuCode
-    
     let orderedSkus = [
-        "MJMW3\(skuCode)/A",
-        "MJMV3\(skuCode)/A"
+        "MHQJ4\(country.skuCode)/A",
+        "MHL64\(country.skuCode)/A",
+        "MHL74\(country.skuCode)/A"
     ]
-    
+
     let skusToName = [
-        "MJMV3\(skuCode)/A": "M1 Max (10c CPU, 24c GPU), 32GB RAM, 512GB SSD",
-        "MJMW3\(skuCode)/A": "M1 Ultra (20c CPU, 48c GPU), 64GB RAM, 1TB SSD"
+        "MHQJ4\(country.skuCode)/A": "Mac Studio M5 Max (18c/40c) 64GB 1TB",
+        "MHL64\(country.skuCode)/A": "Mac Studio M5 Max (18c/32c) 36GB 512GB",
+        "MHL74\(country.skuCode)/A": "Mac Studio M5 Ultra (30c/64c) 96GB 1TB"
     ]
-    
+
     return SKUData(orderedSKUs: orderedSkus, lookup: skusToName)
-}
-
-func MBPDataForCountry(_ country: Country) -> SKUData {
-    
-    let orderedSkus = [
-        "MKGR3\(country.skuCode)/A",
-        "MKGP3\(country.skuCode)/A",
-        "MKGT3\(country.skuCode)/A",
-        "MKGQ3\(country.skuCode)/A",
-        "MMQX3\(country.skuCode)/A",
-        "MKH53\(country.skuCode)/A",
-        "MK1E3\(country.skuCode)/A",
-        "MK183\(country.skuCode)/A",
-        "MK1F3\(country.skuCode)/A",
-        "MK193\(country.skuCode)/A",
-        "MK1H3\(country.skuCode)/A",
-        "MK1A3\(country.skuCode)/A",
-        "MK233\(country.skuCode)/A",
-        "MMQW3\(country.skuCode)/A",
-    ]
-    
-    /**
-     see here for tweet containing all in-store models:
-     https://twitter.com/caseyliss/status/1453007425188024324?s=20
-     */
-    let skusToName = [
-        "MKGR3\(country.skuCode)/A": "14\" M1 Pro (8c CPU, 14c GPU) 16GB/512GB Silver",
-        "MKGP3\(country.skuCode)/A": "14\" M1 Pro (8c CPU, 14c GPU) 16GB/512GB Space Grey",
-        "MKGT3\(country.skuCode)/A": "14\" M1 Pro (10c CPU, 16c GPU) 16GB/1TB Silver",
-        "MKGQ3\(country.skuCode)/A": "14\" M1 Pro (10c CPU, 16c GPU) 16GB/1TB Space Grey",
-        "MMQX3\(country.skuCode)/A": "14\" M1 Max (10c CPU, 32c GPU) 64GB/2TB Silver, Ultimate",
-        "MKH53\(country.skuCode)/A": "14\" M1 Max (10c CPU, 32c GPU) 64GB/2TB Space Grey, Ultimate",
-        
-        "MK1E3\(country.skuCode)/A": "16\" M1 Pro (10c CPU, 16c GPU) 16GB/512GB Silver",
-        "MK183\(country.skuCode)/A": "16\" M1 Pro (10c CPU, 16c GPU) 16GB/512GB Space Grey",
-        "MK1F3\(country.skuCode)/A": "16\" M1 Pro (10c CPU, 16c GPU) 16GB/1TB Silver",
-        "MK193\(country.skuCode)/A": "16\" M1 Pro (10c CPU, 16c GPU) 16GB/1TB Space Grey",
-        
-        "MK1H3\(country.skuCode)/A": "16\" M1 Max (10c CPU, 32c GPU) 32GB/1TB Silver",
-        "MK1A3\(country.skuCode)/A": "16\" M1 Max (10c CPU, 32c GPU) 32GB/1TB Space Grey",
-        "MMQW3\(country.skuCode)/A": "16\" M1 Max (10c CPU, 32c GPU) 64GB/4TB Silver, Ultimate",
-        "MK233\(country.skuCode)/A": "16\" M1 Max (10c CPU, 32c GPU) 64GB/4TB Space Grey, Ultimate",
-    ]
-    
-    return SKUData(orderedSKUs: orderedSkus, lookup: skusToName)
-}
-
-func M2MBPDataForCountry(_ country: Country) -> SKUData {
-    
-    let orderedSkus = [
-        "MNEH3\(country.skuCode)/A", // sg low
-        "MNEJ3\(country.skuCode)/A", // sg high
-        "MNEP3\(country.skuCode)/A", // sv low
-        "MNEQ3\(country.skuCode)/A"  // sv high
-    ]
-    
-    let skusToName = [
-        "MNEH3\(country.skuCode)/A": "13\" M2 8GB/256GB - Space Gray",
-        "MNEJ3\(country.skuCode)/A": "13\" M2 8GB/512GB - Space Gray",
-        "MNEP3\(country.skuCode)/A": "13\" M2 8GB/256GB - Silver",
-        "MNEQ3\(country.skuCode)/A": "13\" M2 8GB/512GB - Silver"
-    ]
-    
-    return SKUData(orderedSKUs: orderedSkus, lookup: skusToName)
-}
-
-func M2MBAirDataForCountry(_ country: Country) -> SKUData {
-    
-    let orderedSkus = [
-        "MLXY3\(country.skuCode)/A",
-        "MLY03\(country.skuCode)/A",
-        "MLY13\(country.skuCode)/A",
-        "MLY23\(country.skuCode)/A",
-        "MLY43\(country.skuCode)/A",
-        "MLY33\(country.skuCode)/A",
-        "MLXX3\(country.skuCode)/A",
-        "MLXW3\(country.skuCode)/A",
-        "MN703\(country.skuCode)/A",
-        "MNQP3\(country.skuCode)/A",
-        "MN6Y3\(country.skuCode)/A"
-    ]
-    
-    let skusToName = [
-        "MLXY3\(country.skuCode)/A": "M2 (8c CPU, 8c GPU) 8GB/256GB Silver",
-        "MLY03\(country.skuCode)/A": "M2 (8c CPU, 10c GPU) 8GB/512GB Silver",
-        "MLY13\(country.skuCode)/A": "M2 (8c CPU, 8c GPU) 8GB/256GB Starlight",
-        "MLY23\(country.skuCode)/A": "M2 (8c CPU, 10c GPU) 8GB/512GB Starlight",
-        "MLY43\(country.skuCode)/A": "M2 (8c CPU, 10c GPU) 8GB/512GB Midnight",
-        "MLY33\(country.skuCode)/A": "M2 (8c CPU, 8c GPU) 8GB/256GB Midnight",
-        "MLXX3\(country.skuCode)/A": "M2 (8c CPU, 10c GPU) 8GB/512GB Space Gray",
-        "MLXW3\(country.skuCode)/A": "M2 (8c CPU, 8c GPU) 8GB/256GB Space Gray",
-        
-        // ultimate builds
-        "MN703\(country.skuCode)/A": "M2 (8c CPU, 10c GPU) 16GB/1TB Midnight",
-        "MNQP3\(country.skuCode)/A": "M2 (8c CPU, 10c GPU) 16GB/1TB Space Gray",
-        "MN6Y3\(country.skuCode)/A": "M2 (8c CPU, 10c GPU) 16GB/1TB Starlight"
-    ]
-    
-    return SKUData(orderedSKUs: orderedSkus, lookup: skusToName)
-}
-
-func AirPodsProGen2DataForCountry(_ country: Country) -> SKUData {
-    let skuCode = country.skuCode(for: .AirPodsProGen2) ?? country.skuCode
-    
-    return SKUData(
-        orderedSKUs: ["MQD83\(skuCode)/A"],
-        lookup: ["MQD83\(skuCode)/A": "AirPods Pro (2nd Generation)"]
-    )
-}
-
-func ApplePencilUSBCAdapterDataForCountry(_ country: Country) -> SKUData {
-    let skuCode = country.skuCode(for: .ApplePencilUSBCAdapter) ?? country.skuCode
-    
-    return SKUData(
-        orderedSKUs: ["MQLU3\(skuCode)/A"],
-        lookup: ["MQLU3\(skuCode)/A": "USB-C to Apple Pencil Adapter"]
-    )
 }

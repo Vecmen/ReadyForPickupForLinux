@@ -14,6 +14,7 @@ enum AppError: Swift.Error, LocalizedError {
     case couldNotGenerateURL
     case noStoresFound
     case storeUnavailable
+    case throttled(Int)
     case invalidStoreResponse
     case unexpectedJSONStructure
     case generic(Error?)
@@ -35,6 +36,8 @@ enum AppError: Swift.Error, LocalizedError {
             return "Unexpected inventory data found. Please confirm that the selected store is valid for the selected country."
         case .storeUnavailable:
             return "Apple's fulfillment API returned an internal server error and is currently unavailable."
+        case .throttled(let statusCode):
+            return "Apple is throttling requests (HTTP \(statusCode)); retrying later."
         case .invalidLocalModelStore, .invalidProjectState, .failedToParseGithubVersion:
             return "InventoryWatch has invalid or currupted local data. Please contact the developer (@worthbak)."
         case .generic(let optional):

@@ -45,9 +45,20 @@ struct DefaultsVendor {
     }
     
     var preferredProductType: ProductType {
-        let value = UserDefaults.standard.string(forKey: "preferredProductType") ?? "MacBookPro"
-        
-        return ProductType(rawValue: value) ?? .MacBookPro
+        let value = UserDefaults.standard.string(forKey: "preferredProductType") ?? "iPhonePro18"
+
+        if let product = ProductType(rawValue: value) {
+            return product
+        }
+
+        // Migration: the saved type was removed from the catalog
+        // (e.g. "iPhonePro14", "MacBookPro"). Rewrite the preference
+        // to a current product so Settings/ContentView pickers (which
+        // read the same key) show a valid selection instead of blank.
+        // preferredSKUs for the old type are left alone; Settings
+        // clears them when the user next changes product type.
+        UserDefaults.standard.set(ProductType.iPhonePro18.rawValue, forKey: "preferredProductType")
+        return .iPhonePro18
     }
     
     var countryPathElement: String {

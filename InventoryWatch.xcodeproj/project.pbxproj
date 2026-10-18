@@ -7,9 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		380CF9FB27448E860080472A /* iPhoneModels13-intl.json in Resources */ = {isa = PBXBuildFile; fileRef = 380CF9FA27448E860080472A /* iPhoneModels13-intl.json */; };
 		3817268E273AA898003B8D76 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3817268D273AA898003B8D76 /* SettingsView.swift */; };
-		382981C328E3EA54008C68F7 /* AppleWatchUltra-intl.json in Resources */ = {isa = PBXBuildFile; fileRef = 382981C228E3EA54008C68F7 /* AppleWatchUltra-intl.json */; };
 		385886AD290827A6003D3C80 /* ModelError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886AC290827A6003D3C80 /* ModelError.swift */; };
 		385886AF290827D6003D3C80 /* SKUDataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886AE290827D6003D3C80 /* SKUDataLoader.swift */; };
 		385886B12908280E003D3C80 /* FulfillmentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886B02908280E003D3C80 /* FulfillmentModel.swift */; };
@@ -22,15 +20,15 @@
 		386FDC5E2739DA7300C1BAC2 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 386FDC5D2739DA7300C1BAC2 /* Preview Assets.xcassets */; };
 		386FDC68273A18F800C1BAC2 /* SKUData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 386FDC67273A18F800C1BAC2 /* SKUData.swift */; };
 		386FDC6A273A200000C1BAC2 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 386FDC69273A200000C1BAC2 /* NotificationManager.swift */; };
-		387F6E7628CCF5B300E68AC0 /* iPhoneModels14-intl.json in Resources */ = {isa = PBXBuildFile; fileRef = 387F6E7528CCF5B300E68AC0 /* iPhoneModels14-intl.json */; };
 		3885D54C2891711E00BD6A78 /* FulfillmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D54B2891711E00BD6A78 /* FulfillmentStore.swift */; };
 		3885D54E2891713200BD6A78 /* PartAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D54D2891713200BD6A78 /* PartAvailability.swift */; };
 		3885D5502891714400BD6A78 /* ProductType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D54F2891714400BD6A78 /* ProductType.swift */; };
 		3885D5522891718600BD6A78 /* AllPhoneModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D5512891718600BD6A78 /* AllPhoneModels.swift */; };
+		38E20A012A6B0001000000C1 /* SavedSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E20A022A6B0001000000C1 /* SavedSearch.swift */; };
 		3885D5542891719600BD6A78 /* GithubTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D5532891719600BD6A78 /* GithubTag.swift */; };
 		3891902D28E882070051FE3A /* Stores_LocalBootstrap.json in Resources */ = {isa = PBXBuildFile; fileRef = 3891902C28E882070051FE3A /* Stores_LocalBootstrap.json */; };
+		38E18B012A6B0001000000B1 /* iPhoneModelsCurrent-intl.json in Resources */ = {isa = PBXBuildFile; fileRef = 38E18B022A6B0001000000B1 /* iPhoneModelsCurrent-intl.json */; };
 		3891902F28E8831B0051FE3A /* StoreBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3891902E28E8831B0051FE3A /* StoreBootstrap.swift */; };
-		3895BE92290ACE5000FBC188 /* AppleWatchData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3895BE91290ACE5000FBC188 /* AppleWatchData.swift */; };
 		3895BE94290B101B00FBC188 /* NotificationSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3895BE93290B101B00FBC188 /* NotificationSender.swift */; };
 		38D0C3A2273C60B500A7DE65 /* Countries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38D0C3A1273C60B500A7DE65 /* Countries.swift */; };
 		38D307DB2745E2E700A0686D /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38D307DA2745E2E700A0686D /* Analytics.swift */; };
@@ -39,9 +37,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		380CF9FA27448E860080472A /* iPhoneModels13-intl.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "iPhoneModels13-intl.json"; sourceTree = "<group>"; };
 		3817268D273AA898003B8D76 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		382981C228E3EA54008C68F7 /* AppleWatchUltra-intl.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "AppleWatchUltra-intl.json"; sourceTree = "<group>"; };
 		385886AC290827A6003D3C80 /* ModelError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelError.swift; sourceTree = "<group>"; };
 		385886AE290827D6003D3C80 /* SKUDataLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SKUDataLoader.swift; sourceTree = "<group>"; };
 		385886B02908280E003D3C80 /* FulfillmentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FulfillmentModel.swift; sourceTree = "<group>"; };
@@ -56,15 +52,15 @@
 		386FDC5F2739DA7300C1BAC2 /* InventoryWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = InventoryWatch.entitlements; sourceTree = "<group>"; };
 		386FDC67273A18F800C1BAC2 /* SKUData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SKUData.swift; sourceTree = "<group>"; };
 		386FDC69273A200000C1BAC2 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
-		387F6E7528CCF5B300E68AC0 /* iPhoneModels14-intl.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "iPhoneModels14-intl.json"; sourceTree = "<group>"; };
 		3885D54B2891711E00BD6A78 /* FulfillmentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FulfillmentStore.swift; sourceTree = "<group>"; };
 		3885D54D2891713200BD6A78 /* PartAvailability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartAvailability.swift; sourceTree = "<group>"; };
 		3885D54F2891714400BD6A78 /* ProductType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductType.swift; sourceTree = "<group>"; };
 		3885D5512891718600BD6A78 /* AllPhoneModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllPhoneModels.swift; sourceTree = "<group>"; };
+		38E20A022A6B0001000000C1 /* SavedSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedSearch.swift; sourceTree = "<group>"; };
 		3885D5532891719600BD6A78 /* GithubTag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GithubTag.swift; sourceTree = "<group>"; };
 		3891902C28E882070051FE3A /* Stores_LocalBootstrap.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Stores_LocalBootstrap.json; sourceTree = "<group>"; };
+		38E18B022A6B0001000000B1 /* iPhoneModelsCurrent-intl.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "iPhoneModelsCurrent-intl.json"; sourceTree = "<group>"; };
 		3891902E28E8831B0051FE3A /* StoreBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreBootstrap.swift; sourceTree = "<group>"; };
-		3895BE91290ACE5000FBC188 /* AppleWatchData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleWatchData.swift; sourceTree = "<group>"; };
 		3895BE93290B101B00FBC188 /* NotificationSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSender.swift; sourceTree = "<group>"; };
 		38D0C3A1273C60B500A7DE65 /* Countries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Countries.swift; sourceTree = "<group>"; };
 		38D307DA2745E2E700A0686D /* Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
@@ -90,7 +86,7 @@
 				3885D54B2891711E00BD6A78 /* FulfillmentStore.swift */,
 				3891902E28E8831B0051FE3A /* StoreBootstrap.swift */,
 				3885D5512891718600BD6A78 /* AllPhoneModels.swift */,
-				3895BE91290ACE5000FBC188 /* AppleWatchData.swift */,
+				38E20A022A6B0001000000C1 /* SavedSearch.swift */,
 				3885D54D2891713200BD6A78 /* PartAvailability.swift */,
 				3885D5532891719600BD6A78 /* GithubTag.swift */,
 			);
@@ -122,9 +118,7 @@
 				3885D54A289170E700BD6A78 /* Model */,
 				38E1C21927E6714E0047703D /* Helpers.swift */,
 				3891902C28E882070051FE3A /* Stores_LocalBootstrap.json */,
-				380CF9FA27448E860080472A /* iPhoneModels13-intl.json */,
-				387F6E7528CCF5B300E68AC0 /* iPhoneModels14-intl.json */,
-				382981C228E3EA54008C68F7 /* AppleWatchUltra-intl.json */,
+				38E18B022A6B0001000000B1 /* iPhoneModelsCurrent-intl.json */,
 				386FDC67273A18F800C1BAC2 /* SKUData.swift */,
 				38D0C3A1273C60B500A7DE65 /* Countries.swift */,
 				386FDC5A2739DA7300C1BAC2 /* Assets.xcassets */,
@@ -218,11 +212,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				387F6E7628CCF5B300E68AC0 /* iPhoneModels14-intl.json in Resources */,
 				38E4279E273EF542006BF6D7 /* Credits.rtf in Resources */,
 				3891902D28E882070051FE3A /* Stores_LocalBootstrap.json in Resources */,
-				382981C328E3EA54008C68F7 /* AppleWatchUltra-intl.json in Resources */,
-				380CF9FB27448E860080472A /* iPhoneModels13-intl.json in Resources */,
+				38E18B012A6B0001000000B1 /* iPhoneModelsCurrent-intl.json in Resources */,
 				386FDC5E2739DA7300C1BAC2 /* Preview Assets.xcassets in Resources */,
 				386FDC5B2739DA7300C1BAC2 /* Assets.xcassets in Resources */,
 			);
@@ -251,10 +243,10 @@
 				385886AF290827D6003D3C80 /* SKUDataLoader.swift in Sources */,
 				385886B12908280E003D3C80 /* FulfillmentModel.swift in Sources */,
 				3885D5542891719600BD6A78 /* GithubTag.swift in Sources */,
-				3895BE92290ACE5000FBC188 /* AppleWatchData.swift in Sources */,
 				38D0C3A2273C60B500A7DE65 /* Countries.swift in Sources */,
 				385886B32908281F003D3C80 /* GithubModel.swift in Sources */,
 				3885D5522891718600BD6A78 /* AllPhoneModels.swift in Sources */,
+				38E20A012A6B0001000000C1 /* SavedSearch.swift in Sources */,
 				386FDC572739DA7300C1BAC2 /* InventoryWatchApp.swift in Sources */,
 				3885D5502891714400BD6A78 /* ProductType.swift in Sources */,
 			);
@@ -315,7 +307,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -371,7 +363,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -402,7 +394,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.5;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 0.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.worthbak.InventoryWatch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -434,7 +426,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.5;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 0.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.worthbak.InventoryWatch;
 				PRODUCT_NAME = "$(TARGET_NAME)";

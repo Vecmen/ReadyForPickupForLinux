@@ -7,123 +7,64 @@
 
 import Foundation
 
+/// Catalog focus (2026-10): only hero products Apple currently sells new —
+/// all current iPhones and all current Macs. Discontinued 2022-era types
+/// (iPhone 13/14, Watch Ultra gen 1, M1/M2 Macs, old iPads/AirPods/
+/// Studio Display, etc.) were removed; a saved `preferredProductType`
+/// naming a removed case decodes to nil and falls back to a current
+/// product (see DefaultsVendor), it does not crash.
 enum ProductCategory: String, Codable, CaseIterable, Identifiable {
     var id: Self { self }
-    
-    case Mac, iPad, iPhone, AppleWatch, Accessories
-    
+
+    case Mac, iPhone
+
     var products: [ProductType] {
         switch self {
         case .Mac:
-            return [.MacStudio, .M2MacBookPro13, .M2MacBookAir, .MacBookPro]
-        case .iPad:
-            return [
-                .iPadMiniWifi,
-                .iPadMiniCellular,
-                .iPad10thGenWifi,
-                .iPad10thGenCellular,
-                .iPadProM2_11in_Wifi,
-                .iPadProM2_11in_Cellular,
-                .iPadProM2_13in_Wifi,
-                .iPadProM2_13in_Cellular
-            ]
+            return [.MacBookNeo, .M5MacBookAir13, .M5MacBookAir15, .MacBookPro14, .MacBookPro16, .iMac, .MacMini, .MacStudio]
         case .iPhone:
-            return [
-                .iPhoneRegular13,
-                .iPhoneMini13,
-                .iPhoneRegular14,
-                .iPhonePlus14,
-                .iPhonePro14,
-                .iPhoneProMax14
-            ]
-        case .AppleWatch:
-            return [.AppleWatchUltra]
-        case .Accessories:
-            return [.StudioDisplay, .AirPodsProGen2, .ApplePencilUSBCAdapter]
+            return [.iPhone16, .iPhone17, .iPhone17e, .iPhoneAir, .iPhoneDuo, .iPhonePro18, .iPhoneProMax18]
         }
     }
 }
 
 enum ProductType: String, Codable, CaseIterable, Identifiable {
     var id: Self { self }
-    
-    case MacBookPro
-    case M2MacBookPro13
-    case M2MacBookAir
+
+    case MacBookNeo
+    case M5MacBookAir13
+    case M5MacBookAir15
+    case MacBookPro14
+    case MacBookPro16
+    case iMac
+    case MacMini
     case MacStudio
-    
-    case StudioDisplay
-    case AirPodsProGen2
-    case ApplePencilUSBCAdapter
-    
-    case iPadMiniWifi
-    case iPadMiniCellular
-    case iPad10thGenWifi
-    case iPad10thGenCellular
-    case iPadProM2_11in_Wifi
-    case iPadProM2_11in_Cellular
-    case iPadProM2_13in_Wifi
-    case iPadProM2_13in_Cellular
-    
-    case iPhoneRegular13
-    case iPhoneMini13
-    case iPhoneRegular14
-    case iPhonePlus14
-    case iPhonePro14
-    case iPhoneProMax14
-    
-    case AppleWatchUltra
-    
+
+    case iPhone16
+    case iPhone17
+    case iPhone17e
+    case iPhoneAir
+    case iPhoneDuo
+    case iPhonePro18
+    case iPhoneProMax18
+
     var presentableName: String {
         switch self {
-        case .MacBookPro:
-            return "MacBook Pro"
-        case .M2MacBookPro13:
-            return "M2 MacBook Pro 13in"
-        case .M2MacBookAir:
-            return "M2 MacBook Air"
-        case .MacStudio:
-            return "Mac Studio"
-            
-        case .StudioDisplay:
-            return "Studio Display"
-        case .AirPodsProGen2:
-            return "AirPods Pro"
-        case .ApplePencilUSBCAdapter:
-            return "USB-C to Apple Pencil Adapter"
-            
-        case .iPadMiniWifi:
-            return "iPad mini (Wifi)"
-        case .iPadMiniCellular:
-            return "iPad mini (Cellular)"
-        case .iPad10thGenWifi:
-            return "iPad (10th Gen) (Wifi)"
-        case .iPad10thGenCellular:
-            return "iPad (10th Gen) (Cellular)"
-        case .iPadProM2_11in_Wifi:
-            return "M2 iPad Pro 11in (Wifi)"
-        case .iPadProM2_11in_Cellular:
-            return "M2 iPad Pro 11in (Cellular)"
-        case .iPadProM2_13in_Wifi:
-            return "M2 iPad Pro 12.9in (Wifi)"
-        case .iPadProM2_13in_Cellular:
-            return "M2 iPad Pro 12.9in (Cellular)"
-            
-        case .iPhoneRegular13:
-            return "iPhone 13"
-        case .iPhoneMini13:
-            return "iPhone 13 mini"
-        case .iPhoneRegular14:
-            return "iPhone 14"
-        case .iPhonePlus14:
-            return "iPhone 14 Plus"
-        case .iPhonePro14:
-            return "iPhone 14 Pro"
-        case .iPhoneProMax14:
-            return "iPhone 14 Pro Max"
-            
-        case.AppleWatchUltra:
-            return "Apple Watch Ultra"
+        case .MacBookNeo: return "MacBook Neo"
+        case .M5MacBookAir13: return "M5 MacBook Air 13in"
+        case .M5MacBookAir15: return "M5 MacBook Air 15in"
+        case .MacBookPro14: return "MacBook Pro 14in"
+        case .MacBookPro16: return "MacBook Pro 16in"
+        case .iMac: return "iMac"
+        case .MacMini: return "Mac mini"
+        case .MacStudio: return "Mac Studio"
+        case .iPhone16: return "iPhone 16"
+        case .iPhone17: return "iPhone 17"
+        case .iPhone17e: return "iPhone 17e"
+        case .iPhoneAir: return "iPhone Air"
+        case .iPhoneDuo: return "iPhone Duo"
+        case .iPhonePro18: return "iPhone 18 Pro"
+        case .iPhoneProMax18: return "iPhone 18 Pro Max"
         }
     }
 }
