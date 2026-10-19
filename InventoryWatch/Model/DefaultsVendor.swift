@@ -133,13 +133,12 @@ struct DefaultsVendor {
 /// legacy preference (preferredStoreNumber, preferredSKUs, Pushover
 /// enable flag, Sparkle settings, etc.) would appear empty on first launch
 /// of the renamed app. Copies only keys missing in the new domain, then
-/// records completion. Pushover secrets live in the Keychain (not
-/// UserDefaults), so they are migrated separately service-to-service in
-/// PushoverClient's KeychainStore terms; no values are logged.
+/// records completion. Pushover keys are deliberately not migrated: they
+/// live in the old app's Keychain items, and macOS asks for the login
+/// password whenever a different app reads those, so users re-enter them.
 enum LegacyDataMigration {
     static let legacyBundleIdentifier = "com.worthbak.InventoryWatch"
     private static let migrationKey = "legacyDataMigrationCompletedV1"
-    private static let pushoverMigrationKey = "legacyPushoverMigrationCompletedV1"
 
     static func migrateIfNeeded() {
         let standard = UserDefaults.standard
@@ -151,34 +150,7 @@ enum LegacyDataMigration {
                     standard.set(value, forKey: key)
                 }
             }
-            // Record the UserDefaults migration BEFORE touching the
-            // Keychain: reading the old Pushover service from the renamed
-            // app can prompt for Keychain access, and the defaults must
-            // not be re-copied if that prompt is dismissed/delayed.
             standard.set(true, forKey: migrationKey)
-            _ = standard.synchronize()
-        }
-
-        guard standard.bool(forKey: pushoverMigrationKey) == false else { return }
-
-        // Pushover credentials: old service -> new service, only if the
-        // new service has no value for that account yet. Only mark this
-        // complete when every old-service read definitively succeeded or
-        // found nothing; an authorization failure retries next launch.
-        var pushoverMigrationComplete = true
-        for account in ["userKey", "apiToken"] {
-            let existing = KeychainStore.string(account: account, service: KeychainStore.service)
-            if (existing ?? "").isEmpty {
-                let old = KeychainStore.stringWithStatus(account: account, service: KeychainStore.legacyService)
-                if old.status == errSecSuccess, let value = old.value, value.isEmpty == false {
-                    KeychainStore.set(value, account: account, service: KeychainStore.service)
-                } else if old.status != errSecItemNotFound {
-                    pushoverMigrationComplete = false
-                }
-            }
-        }
-        if pushoverMigrationComplete {
-            standard.set(true, forKey: pushoverMigrationKey)
             _ = standard.synchronize()
         }
     }

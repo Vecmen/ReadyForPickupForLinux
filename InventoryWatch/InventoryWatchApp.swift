@@ -14,8 +14,8 @@ struct ReadyForPickupApp: App {
 
     init() {
         // Must run before ViewModel/SearchStore/PushoverSettings read
-        // UserDefaults.standard (the new bundle-ID domain) or the new
-        // Keychain service, so existing users keep their data.
+        // UserDefaults.standard (the new bundle-ID domain), so existing
+        // users keep their data.
         LegacyDataMigration.migrateIfNeeded()
         _model = StateObject(wrappedValue: ViewModel())
         _updater = StateObject(wrappedValue: UpdaterViewModel())
