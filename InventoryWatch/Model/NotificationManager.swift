@@ -8,7 +8,9 @@
 import Foundation
 import UserNotifications
 
-final class NotificationManager: NSObject {
+// Sendable (no stored state) rather than @MainActor: UserNotifications
+// calls the delegate method and completion handlers on its own queue.
+final class NotificationManager: NSObject, Sendable {
     
     static let shared = NotificationManager()
     
