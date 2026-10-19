@@ -16,15 +16,9 @@ enum AppError: Swift.Error, LocalizedError {
     case throttled(Int)
     case invalidStoreResponse
     case unexpectedJSONStructure
-    case generic(Error?)
     
     var errorDescription: String? {
-        switch self {
-        case .generic(let error):
-            return error?.localizedDescription ?? "unknown error"
-        default:
-            return "\(self)"
-        }
+        return "\(self)"
     }
     
     var errorMessage: String {
@@ -39,8 +33,6 @@ enum AppError: Swift.Error, LocalizedError {
             return "Apple is throttling requests (HTTP \(statusCode)); retrying later."
         case .invalidLocalModelStore, .invalidProjectState:
             return "ReadyForPickup has invalid or corrupted local data."
-        case .generic(let optional):
-            return "A network error occurred. Details: \(optional?.localizedDescription ?? "unknown")"
         }
     }
 }

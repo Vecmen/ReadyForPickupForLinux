@@ -9,15 +9,7 @@ import Foundation
 
 actor SKUDataLoader {
 
-    var defaultsManager = DefaultsVendor()
-
     private var cachediPhoneData: [Country: AllPhoneModels] = [:]
-
-    var skuDataForPreferredProduct: SKUData {
-        get async throws {
-            return try await skuData(for: defaultsManager.preferredProductType, and: defaultsManager.preferredCountry)
-        }
-    }
 
     func skuData(for productType: ProductType, and country: Country) async throws -> SKUData {
         switch productType {
