@@ -22,41 +22,19 @@ actor FulfillmentModel {
 
     private var cachedStoreData: [String: StoreCountry] = [:]
 
+    /// Stores by locale, from the bundled Stores_LocalBootstrap.json.
+    /// Apple's remote store list (rsp-web/store-list) is gone (HTTP 404),
+    /// so the bundled copy is refreshed by the maintainer instead.
     func loadStoresByCountry() async throws -> [String: StoreCountry] {
         if cachedStoreData.isEmpty == false {
             return cachedStoreData
         }
-
-        let decoder = JSONDecoder()
-
-        do {
-            // Remote store list currently returns HTTP 404 (live
-            // 2026-10-18); this throws and falls back to local data.
-            let url = URL(string: "https://www.apple.com/rsp-web/store-list?locale=en_US")!
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let jsonStores = try decoder.decode(StoreBootstrap.self, from: data)
-
-            cachedStoreData = jsonStores.countryData
-            return jsonStores.countryData
-        } catch {
-            print(error)
-        }
-
-        // If remote stores failed to load, fallback to local bootstrap.
-        // Cache it too, or every fetch re-requests the failing remote list.
-        if let path = Bundle.main.path(forResource: "Stores_LocalBootstrap", ofType: "json") {
-            do {
-                let data = try Data(contentsOf: URL(fileURLWithPath: path))
-                let jsonStores = try decoder.decode(StoreBootstrap.self, from: data)
-                cachedStoreData = jsonStores.countryData
-                return jsonStores.countryData
-            } catch {
-                print(error)
-                throw error
-            }
-        } else {
+        guard let url = Bundle.main.url(forResource: "Stores_LocalBootstrap", withExtension: "json") else {
             throw AppError.invalidProjectState
         }
+        let data = try Data(contentsOf: url)
+        cachedStoreData = try JSONDecoder().decode(StoreBootstrap.self, from: data).countryData
+        return cachedStoreData
     }
 
     func storesForPreferredCountry() async throws -> [RetailStore] {
@@ -119,7 +97,6 @@ actor FulfillmentModel {
         guard let url = components.url else { throw AppError.couldNotGenerateURL }
         var request = URLRequest(url: url)
         request.addValue("https://www.apple.com/shop/buy-iphone/", forHTTPHeaderField: "Referer")
-        print(url.absoluteString)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         return try parseStoreResponse(data, response: response as? HTTPURLResponse, skuData: skuData, search: search)

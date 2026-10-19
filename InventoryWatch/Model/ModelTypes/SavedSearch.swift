@@ -95,8 +95,7 @@ struct SavedSearch: Codable, Identifiable, Equatable {
     }
 }
 
-/// UserDefaults-backed store for saved searches, with one-time
-/// migration of the legacy single-search preferences.
+/// UserDefaults-backed store for saved searches.
 enum SearchStore {
     private static let key = "savedSearches"
 
@@ -106,42 +105,20 @@ enum SearchStore {
            decoded.isEmpty == false {
             return decoded
         }
-        let migrated = migrateLegacyPreferences()
-        save(migrated)
-        return migrated
+        let initial = [defaultSearch()]
+        save(initial)
+        return initial
     }
 
     static func save(_ searches: [SavedSearch]) {
         if let data = try? JSONEncoder().encode(searches) {
             UserDefaults.standard.set(data, forKey: key)
         }
-        // Mirror the first search into the legacy keys so the older
-        // DefaultsVendor-based code paths keep seeing a sane value.
-        if let first = searches.first {
-            UserDefaults.standard.set(first.productTypeRaw, forKey: "preferredProductType")
-            UserDefaults.standard.set(first.storeNumber, forKey: "preferredStoreNumber")
-            UserDefaults.standard.set(first.preferredSKUs.joined(separator: ","), forKey: "preferredSKUs")
-            UserDefaults.standard.set(first.includeNearby, forKey: "shouldIncludeNearbyStores")
-            UserDefaults.standard.set(first.onlyPreferred, forKey: "showResultsOnlyForPreferredModels")
-        }
     }
 
-    /// Builds the first saved search from the pre-2.0 single-search
-    /// UserDefaults keys, so an existing setup is not lost.
-    static func migrateLegacyPreferences() -> [SavedSearch] {
-        let defaults = DefaultsVendor()
-        var search = SavedSearch(
-            productType: defaults.preferredProductType,
-            storeNumber: defaults.preferredStoreNumber,
-            includeNearby: defaults.shouldIncludeNearbyStores,
-            preferredSKUs: Array(defaults.preferredSKUs).sorted(),
-            onlyPreferred: defaults.showResultsOnlyForPreferredModels,
-            notifyOnThisMac: true
-        )
-        if let custom = defaults.customSkuData {
-            search.customSku = custom.sku
-            search.customSkuNickname = custom.nickname
-        }
-        return [search]
+    /// The first search of a fresh install, and the replacement when
+    /// the last search is deleted.
+    static func defaultSearch() -> SavedSearch {
+        SavedSearch(productType: .iPhonePro18, storeNumber: "R032", storeName: "SoHo")
     }
 }

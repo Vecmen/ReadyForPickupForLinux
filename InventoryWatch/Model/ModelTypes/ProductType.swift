@@ -10,9 +10,9 @@ import Foundation
 /// Catalog focus (2026-10): only hero products Apple currently sells new —
 /// all current iPhones and all current Macs. Discontinued 2022-era types
 /// (iPhone 13/14, Watch Ultra gen 1, M1/M2 Macs, old iPads/AirPods/
-/// Studio Display, etc.) were removed; a saved `preferredProductType`
-/// naming a removed case decodes to nil and falls back to a current
-/// product (see DefaultsVendor), it does not crash.
+/// Studio Display, etc.) were removed; a saved search naming a removed
+/// case falls back to a current product (see SavedSearch.productType),
+/// it does not crash.
 enum ProductCategory: String, Codable, CaseIterable, Identifiable {
     var id: Self { self }
 

@@ -7,7 +7,8 @@
 
 import Foundation
 
-#warning("Would be good to unify this model with `RetailStore`")
+/// A store as the pickup-message API reports it, with its parts'
+/// availability (`RetailStore` is the bundled store-list entry).
 struct FulfillmentStore: Equatable {
     let storeName: String
     let storeNumber: String

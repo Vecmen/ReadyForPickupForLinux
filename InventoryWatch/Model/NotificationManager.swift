@@ -6,7 +6,10 @@
 //
 
 import Foundation
+import os
 import UserNotifications
+
+private let logger = Logger(subsystem: "com.wehbs.ReadyForPickup", category: "Notifications")
 
 // Sendable (no stored state) rather than @MainActor: UserNotifications
 // calls the delegate method and completion handlers on its own queue.
@@ -19,10 +22,10 @@ final class NotificationManager: NSObject, Sendable {
         center.delegate = self
         
         center.requestAuthorization(options: [.alert, .badge, .sound]) { (granted, error) in
-            if granted {
-                print("Notifications are enabled.")
-            } else {
-                print("Notifications are disabled.")
+            if let error {
+                logger.error("Notification authorization failed: \(error.localizedDescription, privacy: .public)")
+            } else if granted == false {
+                logger.info("Notifications are disabled for this app")
             }
         }
     }
@@ -41,8 +44,8 @@ final class NotificationManager: NSObject, Sendable {
         // Schedule the request with the system.
         let notificationCenter = UNUserNotificationCenter.current()
         notificationCenter.add(request) { (error) in
-            if error != nil {
-                print(error ?? "notification error!")
+            if let error {
+                logger.error("Couldn't post a notification: \(error.localizedDescription, privacy: .public)")
             }
         }
     }

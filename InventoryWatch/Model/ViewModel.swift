@@ -6,12 +6,14 @@
 //
 
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.wehbs.ReadyForPickup", category: "Inventory")
 
 @MainActor
 final class ViewModel: ObservableObject {
 
     private let fulfillmentModel = FulfillmentModel()
-    private var defaultsVendor = DefaultsVendor()
 
     @Published var searches: [SavedSearch] = []
     @Published var selectedSearchID: UUID?
@@ -25,9 +27,9 @@ final class ViewModel: ObservableObject {
     // can be fetched twice at once (e.g. edited during a sweep).
     @Published private var fetchesInFlight: [UUID: Int] = [:]
 
-    // Auto-refresh (minutes; 0 = Off). Backed by legacy
-    // `preferredUpdateInterval`; only 0/5/10/15/30 are honoured -
-    // any other stored legacy value (e.g. 1) is coerced to 5.
+    // Auto-refresh (minutes; 0 = Off). Stored as
+    // `preferredUpdateInterval` (shared with the Settings picker); only
+    // 0/5/10/15/30 are honoured - any other stored value is coerced to 5.
     @Published var autoRefreshIntervalMinutes: Int = 5
     @Published var nextAutoRefreshAt: Date?
     @Published var throttledUntil: Date?
@@ -59,12 +61,7 @@ final class ViewModel: ObservableObject {
     }
 
     var selectedSearch: SavedSearch? {
-        get { searches.first(where: { $0.id == selectedSearchID }) ?? searches.first }
-        set {
-            guard let newValue, let idx = searches.firstIndex(where: { $0.id == newValue.id }) else { return }
-            searches[idx] = newValue
-            SearchStore.save(searches)
-        }
+        searches.first(where: { $0.id == selectedSearchID }) ?? searches.first
     }
 
     func storeName(for search: SavedSearch) -> String {
@@ -74,12 +71,6 @@ final class ViewModel: ObservableObject {
 
     func availableCount(for search: SavedSearch) -> Int {
         (results[search.id] ?? []).reduce(0) { $0 + $1.1.count }
-    }
-
-    func preferredCount(for search: SavedSearch) -> Int {
-        (results[search.id] ?? []).reduce(0) { acc, next in
-            acc + next.1.filter { search.isPreferred($0) }.count
-        }
     }
 
     /// Any fetch in flight (toolbar spinner).
@@ -101,7 +92,7 @@ final class ViewModel: ObservableObject {
                 searches[idx].storeName = stores.first(where: { $0.storeNumber == searches[idx].storeNumber })?.name ?? searches[idx].storeName
             }
         } catch {
-            print(error)
+            logger.error("Couldn't load the store list: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -112,7 +103,7 @@ final class ViewModel: ObservableObject {
             skuDataByProduct[productType] = data
             return data
         } catch {
-            print(error)
+            logger.error("Couldn't load models for \(productType.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }
@@ -120,9 +111,9 @@ final class ViewModel: ObservableObject {
     // MARK: - Search management
 
     func addSearch() {
-        let product: ProductType = .iPhonePro18
-        let store = stores.first(where: { $0.storeNumber == defaultsVendor.preferredStoreNumber }) ?? stores.first
-        let search = SavedSearch(productType: product, storeNumber: store?.storeNumber ?? "R032", storeName: store?.name)
+        // Starts at the selected search's store.
+        let template = selectedSearch ?? SearchStore.defaultSearch()
+        let search = SavedSearch(productType: .iPhonePro18, storeNumber: template.storeNumber, storeName: template.storeName)
         searches.append(search)
         selectedSearchID = search.id
         SearchStore.save(searches)
@@ -143,7 +134,7 @@ final class ViewModel: ObservableObject {
         }
         if searches.isEmpty {
             // Never leave the app with zero searches.
-            searches = [SavedSearch(productType: .iPhonePro18, storeNumber: "R032", storeName: "SoHo")]
+            searches = [SearchStore.defaultSearch()]
             selectedSearchID = searches.first?.id
         }
         SearchStore.save(searches)
@@ -241,24 +232,19 @@ final class ViewModel: ObservableObject {
         autoRefreshTask = nil
         nextAutoRefreshAt = nil
 
-        guard autoRefreshIntervalMinutes > 0 else {
-            print("[AutoRefresh] off")
-            return
-        }
+        guard autoRefreshIntervalMinutes > 0 else { return }
 
         autoRefreshTask = Task { [weak self] in
             while Task.isCancelled == false {
                 guard let self else { return }
                 let delay = self.currentAutoRefreshDelay()
-                let next = Date().addingTimeInterval(delay)
-                self.nextAutoRefreshAt = next
-                print("[AutoRefresh] next refresh in \(Int(delay))s at \(next)")
+                self.nextAutoRefreshAt = Date().addingTimeInterval(delay)
+                logger.debug("Next auto-refresh in \(Int(delay))s")
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 if Task.isCancelled { return }
                 await self.sweep()
             }
         }
-        print("[AutoRefresh] started, every \(autoRefreshIntervalMinutes) min")
     }
 
     /// Re-reads Pushover config after Settings edits.
@@ -334,7 +320,7 @@ final class ViewModel: ObservableObject {
             // URLSession throws URLError(.cancelled) when the calling task
             // is cancelled; a cancelled fetch is not a failure.
             if Task.isCancelled { return nil }
-            print(error)
+            logger.error("Fetch failed for \(search.productTypeRaw, privacy: .public) at \(search.storeNumber, privacy: .public): \(error.localizedDescription, privacy: .public)")
             if case AppError.throttled(let statusCode) = error { return statusCode }
             if currentVersion(of: search) != nil {
                 searchErrors[search.id] = error.localizedDescription
@@ -389,9 +375,9 @@ final class ViewModel: ObservableObject {
             Task {
                 do {
                     try await PushoverClient.send(title: alert.title, message: alert.message)
-                    print("[Pushover] sent for search \(search.id)")
+                    logger.info("Pushover alert sent for \(search.productTypeRaw, privacy: .public)")
                 } catch {
-                    print("[Pushover] send failed: \(error.localizedDescription)")
+                    logger.error("Pushover send failed: \(error.localizedDescription, privacy: .public)")
                     self.pushoverFeedback = "Pushover send failed: \(error.localizedDescription)"
                 }
             }
