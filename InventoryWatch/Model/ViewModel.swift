@@ -40,7 +40,6 @@ final class ViewModel: ObservableObject {
     // Legacy published state kept for the app scene / commands.
     @Published var availableParts: [(FulfillmentStore, [PartAvailability])] = []
     @Published var errorState: AppError?
-    @Published var hasLatestVersion = true
     @Published var preferredStoreName: String? = nil
 
     /// Allowed auto-refresh intervals in minutes (0 = Off).
@@ -170,6 +169,8 @@ final class ViewModel: ObservableObject {
             if index > 0 {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
+            // restartAutoRefresh()/stopAutoRefresh() cancel the loop's sweep.
+            if Task.isCancelled { return }
             await fetch(search: search)
         }
     }
@@ -275,6 +276,9 @@ final class ViewModel: ObservableObject {
             throttledUntil = nil
             notifyIfNeeded(search: search, parts: parts)
         } catch {
+            // URLSession throws URLError(.cancelled) when the calling task
+            // is cancelled; a superseded sweep is not a fetch failure.
+            if Task.isCancelled { return }
             let message: String
             if case AppError.throttled(let statusCode) = error {
                 throttleFailureCount += 1

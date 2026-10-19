@@ -8,7 +8,6 @@
 import Foundation
 
 enum AppError: Swift.Error, LocalizedError {
-    case failedToParseGithubVersion
     case invalidLocalModelStore
     case invalidProjectState
     case couldNotGenerateURL
@@ -38,7 +37,7 @@ enum AppError: Swift.Error, LocalizedError {
             return "Apple's fulfillment API returned an internal server error and is currently unavailable."
         case .throttled(let statusCode):
             return "Apple is throttling requests (HTTP \(statusCode)); retrying later."
-        case .invalidLocalModelStore, .invalidProjectState, .failedToParseGithubVersion:
+        case .invalidLocalModelStore, .invalidProjectState:
             return "ReadyForPickup has invalid or corrupted local data."
         case .generic(let optional):
             return "A network error occurred. Details: \(optional?.localizedDescription ?? "unknown")"
