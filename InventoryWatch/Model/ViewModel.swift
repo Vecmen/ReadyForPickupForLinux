@@ -130,11 +130,14 @@ final class ViewModel: ObservableObject {
         Task { await fetch(search: search) }
     }
 
-    func deleteSelectedSearch() {
-        guard let id = selectedSearch?.id else { return }
+    func deleteSearch(id: UUID) {
         searches.removeAll { $0.id == id }
         results[id] = nil
-        selectedSearchID = searches.first?.id
+        // Deleting from the sidebar menu can target an unselected search;
+        // only move the selection when the selected one went away.
+        if searches.contains(where: { $0.id == selectedSearchID }) == false {
+            selectedSearchID = searches.first?.id
+        }
         if searches.isEmpty {
             // Never leave the app with zero searches.
             searches = [SavedSearch(productType: .iPhonePro18, storeNumber: "R032", storeName: "SoHo")]
@@ -154,6 +157,13 @@ final class ViewModel: ObservableObject {
 
     func fetchSelected() async {
         guard let search = selectedSearch else { return }
+        await refreshSearch(id: search.id)
+    }
+
+    /// Manual refresh of one search (toolbar, Retry, sidebar menu). Like
+    /// any manual refresh, it reschedules auto-refresh.
+    func refreshSearch(id: UUID) async {
+        guard let search = searches.first(where: { $0.id == id }) else { return }
         await fetch(search: search)
         restartAutoRefresh()
     }
