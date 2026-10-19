@@ -13,7 +13,7 @@ Download the `.dmg` from the latest release, open it, and drag ReadyForPickup in
 - Watches Apple Store pickup stock for current US iPhones and Macs
 - Multiple saved searches with your preferred models and stores
 - Alerts on this Mac, and optional Pushover phone notifications (bring your own Pushover app token)
-- Auto-refresh with throttle backoff, and Sparkle auto-updates from version 0.3.2 onward
+- Auto-refresh with throttle backoff, and Sparkle auto-updates from version 0.3.3 onward
 
 ## Source
 

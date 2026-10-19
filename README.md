@@ -24,7 +24,7 @@ ReadyForPickup 0.3.2+ uses [Sparkle 2.9.6](https://github.com/sparkle-project/Sp
 
 - **Update feed:** `https://raw.githubusercontent.com/wehbs/ReadyForPickup/main/appcast.xml` — a file in this repo (on `main`), chosen so releases are version-controlled, reviewable, and don't depend on a separate hosting service. The DMG enclosures it points to are GitHub Release assets.
 - **Signing key:** updates are EdDSA-signed. The *private* key lives only in the maintainer's Mac login Keychain (created by Sparkle's `generate_keys`; service `https://sparkle-project.org`, account `ed25519`) — it is never in this repo. Only the public key (`SUPublicEDKey`) is embedded in the app's `Info.plist`.
-- **One-time manual update:** v0.3.1 and earlier were built *without* Sparkle, so they cannot self-update. Download v0.3.2 (or later) manually once from the Releases page; after that, updates flow automatically.
+- **One-time manual update:** v0.3.1 and earlier were built *without* Sparkle, and v0.3.2 was signed without the sandbox entitlements Sparkle's installer needs, so none of them can install updates themselves. Download v0.3.3 (or later) manually once from the Releases page; after that, updates install automatically.
 
 ## Releasing
 
@@ -34,4 +34,4 @@ Run `Scripts/build-notarized-release.sh` (see its header). It builds, signs Spar
 2. `gh release create v<VERSION> /tmp/readyforpickup-release/ReadyForPickup-<VERSION>.dmg --repo wehbs/ReadyForPickup --title "ReadyForPickup <VERSION>" --notes "…"` — **always pass `--repo wehbs/ReadyForPickup`** (`gh` otherwise defaults to the upstream worthbak repo here).
 3. Verify: the release asset downloads (HTTP 200), its SHA-256 matches the local DMG, the mounted app passes `spctl -a -vvv` (`accepted source=Notarized Developer ID`), and the live appcast enclosure URL/signature match. Note the DMG itself may show `spctl` "no usable signature" (it isn't codesigned) — the app inside is what matters.
 
-Do not delete old releases; note in the release notes that 0.3.2 is the first auto-updating release.
+Do not delete old releases.
