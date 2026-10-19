@@ -37,46 +37,35 @@ enum PushoverSettings {
 
 /// Minimal Keychain generic-password storage.
 enum KeychainStore {
-    static let service = "com.wehbs.ReadyForPickup.pushover"
-    static let legacyService = "com.worthbak.InventoryWatch.pushover"
+    private static let service = "com.wehbs.ReadyForPickup.pushover"
 
-    static func string(account: String) -> String? { string(account: account, service: service) }
-
-    static func string(account: String, service: String) -> String? {
-        stringWithStatus(account: account, service: service).value
-    }
-
-    /// Status distinguishes "item not found" (migration can finish) from
-    /// Keychain authorization/interaction failures (must retry next launch).
-    static func stringWithStatus(account: String, service: String) -> (status: OSStatus, value: String?) {
-        var query = baseQuery(account: account, service: service)
+    static func string(account: String) -> String? {
+        var query = baseQuery(account: account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data else { return (status, nil) }
-        return (status, String(data: data, encoding: .utf8))
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
-    static func set(_ value: String, account: String) { set(value, account: account, service: service) }
-
-    static func set(_ value: String, account: String, service: String) {
+    static func set(_ value: String, account: String) {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            SecItemDelete(baseQuery(account: account, service: service) as CFDictionary)
+            SecItemDelete(baseQuery(account: account) as CFDictionary)
             return
         }
         let data = Data(trimmed.utf8)
-        let status = SecItemUpdate(baseQuery(account: account, service: service) as CFDictionary,
+        let status = SecItemUpdate(baseQuery(account: account) as CFDictionary,
                                    [kSecValueData as String: data] as CFDictionary)
         if status == errSecItemNotFound {
-            var query = baseQuery(account: account, service: service)
+            var query = baseQuery(account: account)
             query[kSecValueData as String] = data
             SecItemAdd(query as CFDictionary, nil)
         }
     }
 
-    private static func baseQuery(account: String, service: String) -> [String: Any] {
+    private static func baseQuery(account: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: service,
          kSecAttrAccount as String: account]
