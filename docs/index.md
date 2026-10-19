@@ -2,8 +2,6 @@
 
 ReadyForPickup is a macOS app that watches Apple Store pickup availability for iPhone and Mac and alerts you when your configuration is ready nearby.
 
-![ReadyForPickup screenshot](./iw-2.0-mkt.jpg)
-
 ## Download
 
 [Download the latest release](https://github.com/wehbs/ReadyForPickup/releases/latest)
