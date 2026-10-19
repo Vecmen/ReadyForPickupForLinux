@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Build a Developer ID-signed, notarized, Sparkle-ready InventoryWatch DMG.
+# Build a Developer ID-signed, notarized, Sparkle-ready ReadyForPickup DMG.
 #
 # Flow: build Release (unsigned) -> sign Sparkle nested code then the app
 # -> DMG -> notarize (notarytool --wait) -> staple -> generate/sign appcast.
@@ -26,9 +26,9 @@ fi
 echo "Signing identity: $IDENTITY"
 
 VERSION=$(grep -m1 "MARKETING_VERSION" InventoryWatch.xcodeproj/project.pbxproj | sed -E 's/.*= ([0-9.]+);/\1/')
-WORK=/tmp/inventorywatch-release
-APP="$WORK/DerivedData/Build/Products/Release/InventoryWatch.app"
-DMG="$WORK/InventoryWatch-$VERSION.dmg"
+WORK=/tmp/readyforpickup-release
+APP="$WORK/DerivedData/Build/Products/Release/ReadyForPickup.app"
+DMG="$WORK/ReadyForPickup-$VERSION.dmg"
 rm -rf "$WORK"; mkdir -p "$WORK"
 
 xcodebuild -project InventoryWatch.xcodeproj -scheme InventoryWatch \
@@ -61,7 +61,7 @@ codesign --verify --deep --strict "$APP"
 
 mkdir -p "$WORK/stage"; cp -R "$APP" "$WORK/stage/"
 ln -s /Applications "$WORK/stage/Applications"
-hdiutil create -volname InventoryWatch -srcfolder "$WORK/stage" -ov -format UDZO "$DMG"
+hdiutil create -volname ReadyForPickup -srcfolder "$WORK/stage" -ov -format UDZO "$DMG"
 
 read KEY_ID ISSUER_ID KEY_PATH < <(python3 -c "
 import json,pathlib
@@ -80,7 +80,7 @@ mkdir -p "$WORK/appcast"
 cp "$DMG" "$WORK/appcast/"
 cp appcast.xml "$WORK/appcast/appcast.xml" 2>/dev/null || true
 "$SPARKLE_TOOLS/generate_appcast" \
-  --download-url-prefix "https://github.com/wehbs/inventory-checker-app/releases/download/v$VERSION/" \
+  --download-url-prefix "https://github.com/wehbs/ReadyForPickup/releases/download/v$VERSION/" \
   -o "$WORK/appcast-out.xml" "$WORK/appcast"
 # generate_appcast writes into the archives dir; prefer its appcast.xml
 if [[ -f "$WORK/appcast/appcast.xml" ]]; then cp "$WORK/appcast/appcast.xml" ./appcast.xml; fi

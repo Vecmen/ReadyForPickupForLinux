@@ -230,8 +230,8 @@ final class ViewModel: ObservableObject {
     func sendTestPushover() async {
         do {
             try await PushoverClient.send(
-                title: "InventoryWatch test",
-                message: "This is a test notification from InventoryWatch on your Mac. Pushover is configured correctly.")
+                title: "ReadyForPickup test",
+                message: "This is a test notification from ReadyForPickup on your Mac. Pushover is configured correctly.")
             pushoverFeedback = "Test sent - check Pushover on your phone."
         } catch {
             pushoverFeedback = error.localizedDescription

@@ -8,9 +8,18 @@
 import SwiftUI
 
 @main
-struct InventoryWatchApp: App {
-    @StateObject var model = ViewModel()
-    @StateObject private var updater = UpdaterViewModel()
+struct ReadyForPickupApp: App {
+    @StateObject var model: ViewModel
+    @StateObject private var updater: UpdaterViewModel
+
+    init() {
+        // Must run before ViewModel/SearchStore/PushoverSettings read
+        // UserDefaults.standard (the new bundle-ID domain) or the new
+        // Keychain service, so existing users keep their data.
+        LegacyDataMigration.migrateIfNeeded()
+        _model = StateObject(wrappedValue: ViewModel())
+        _updater = StateObject(wrappedValue: UpdaterViewModel())
+    }
     
     var body: some Scene {
         WindowGroup {

@@ -31,7 +31,7 @@ enum AppError: Swift.Error, LocalizedError {
     var errorMessage: String {
         switch self {
         case .couldNotGenerateURL:
-            return "InventoryWatch failed to construct a valid URL for your search."
+            return "ReadyForPickup failed to construct a valid URL for your search."
         case .invalidStoreResponse, .unexpectedJSONStructure, .noStoresFound:
             return "Unexpected inventory data found. Please confirm that the selected store is valid for the selected country."
         case .storeUnavailable:
@@ -39,7 +39,7 @@ enum AppError: Swift.Error, LocalizedError {
         case .throttled(let statusCode):
             return "Apple is throttling requests (HTTP \(statusCode)); retrying later."
         case .invalidLocalModelStore, .invalidProjectState, .failedToParseGithubVersion:
-            return "InventoryWatch has invalid or currupted local data. Please contact the developer (@worthbak)."
+            return "ReadyForPickup has invalid or corrupted local data."
         case .generic(let optional):
             return "A network error occurred. Details: \(optional?.localizedDescription ?? "unknown")"
         }

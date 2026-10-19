@@ -1,4 +1,4 @@
-title: InventoryWatch
+title: ReadyForPickup
 logo: ./logo.png
-description: Your Guide to Apple Store Inventory
+description: A macOS app that watches Apple Store pickup availability for iPhone and Mac and alerts you when your configuration is ready nearby.
 theme: jekyll-theme-minimal

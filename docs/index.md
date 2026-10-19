@@ -1,31 +1,28 @@
-# InventoryWatch 2.0 is here!
+# ReadyForPickup
 
-![InventoryWatch-Screenshot](./iw-2.0-mkt.jpg)
+ReadyForPickup is a macOS app that watches Apple Store pickup availability for iPhone and Mac and alerts you when your configuration is ready nearby.
 
-[Download today! ➡️](https://inventorywatch.app)
+![ReadyForPickup screenshot](./iw-2.0-mkt.jpg)
 
-## What's New in 2.0
+## Download
 
-InventoryWatch 2.0 is a massive upgrade, adding many of our most-requested features:
+[Download the latest release](https://github.com/wehbs/ReadyForPickup/releases/latest)
 
-* A completely rewritten and redesigned macOS app, with the ability to add multiple searches 
-* Support for email and text notifications - no need to stay glued to your Mac!
-* A brand-new web app, bringing InventoryWatch to any platform with a browser (including your iPhone)
-* Search for Apple's latest products, including the M2 Mac Studio and 15in MacBook Air
-* Server-side product updates - no need to update the app whenever new products are launched
+Download the `.dmg` from the latest release, open it, and drag ReadyForPickup into Applications. ReadyForPickup requires macOS 13 or later.
 
-One thing remains the same: **our committment to privacy, and generally not being creepy**. InventoryWatch doesn't track you, has no ads or invasive analytics packages, and will only send you emails that you've asked for.
+## What it does
 
-## How To Upgrade
+- Watches Apple Store pickup stock for current US iPhones and Macs
+- Multiple saved searches with your preferred models and stores
+- Alerts on this Mac, and optional Pushover phone notifications (bring your own Pushover app token)
+- Auto-refresh with throttle backoff, and Sparkle auto-updates from version 0.3.2 onward
 
-As always, InventoryWatch for macOS is available to download for free. InventoryWatch 2.0 requires macOS Ventura (13.0), and you can download it now at our new homepage: [InventoryWatch.app](https://inventorywatch.app)
+## Source
 
-Support for premium features like email and text notifications, multiple searches, and web access are available via an InventoryWatch subscription, starting at just $2 per month. You can learn more and check out pricing here: [InventoryWatch Pricing](https://inventorywatch.app/plans)
+Source code: [github.com/wehbs/ReadyForPickup](https://github.com/wehbs/ReadyForPickup)
 
-Got feedback, or found a bug? Open an issue at our new feedback repo: [InventoryWatch Feedback on Github](https://github.com/Rugged-Apps/InventoryWatch-Feedback)
+## License and credit
 
-Finally, if you have questions or just want to send us a message, we're on mastodon.social [@InventoryWatch](https://mastodon.social/@InventoryWatch), and [Twitter](https://twitter.com/InventoryWatch) as well (if you're into that kinda thing).
+Licensed under GPL-3.0 — see [LICENSE.md](https://github.com/wehbs/ReadyForPickup/blob/main/LICENSE.md).
 
-We're incredibly excited for you to try InventoryWatch 2.0, and would love to hear what you think!
-
-Learn more: [InventoryWatch.app](https://inventorywatch.app)
+Forked from worthbak/inventory-checker-app (GPL-3.0)

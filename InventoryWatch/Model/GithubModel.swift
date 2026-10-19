@@ -13,7 +13,7 @@ actor GithubModel {
     var latestFetchedReleaseVersion: String?
     
     func hasLatestGithubRelease() async throws -> Bool {
-        guard let url = URL(string: "https://api.github.com/repos/worthbak/inventory-checker-app/tags") else {
+        guard let url = URL(string: "https://api.github.com/repos/wehbs/ReadyForPickup/tags") else {
             throw AppError.couldNotGenerateURL
         }
         

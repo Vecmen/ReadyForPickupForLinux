@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/wehbs/inventory-checker-app/main/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/wehbs/ReadyForPickup/main/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>SZ7c+JXHDKyN6b444kx2priuIcoQP3EyESjLm0GMex4=</string>
 	<key>SUEnableAutomaticChecks</key>
