@@ -389,7 +389,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0.3.3;
+				CURRENT_PROJECT_VERSION = 0.3.4;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"InventoryWatch/Preview Content\"";
 				DEVELOPMENT_TEAM = 2JRPLKN666;
@@ -405,7 +405,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.3.3;
+				MARKETING_VERSION = 0.3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wehbs.ReadyForPickup;
 				PRODUCT_NAME = ReadyForPickup;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -423,7 +423,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0.3.3;
+				CURRENT_PROJECT_VERSION = 0.3.4;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"InventoryWatch/Preview Content\"";
 				DEVELOPMENT_TEAM = 2JRPLKN666;
@@ -439,7 +439,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.3.3;
+				MARKETING_VERSION = 0.3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wehbs.ReadyForPickup;
 				PRODUCT_NAME = ReadyForPickup;
 				SWIFT_EMIT_LOC_STRINGS = YES;
