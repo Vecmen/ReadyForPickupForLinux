@@ -24,10 +24,4 @@ struct NotificationSender {
             .joined(separator: ", ")
         NotificationManager.shared.sendNotification(title: "Preferred Model Found!", body: summary)
     }
-
-    // Legacy single-search entry point.
-    func sendNotificationIfNeeded(availableParts: [(FulfillmentStore, [PartAvailability])], skuData: SKUData) async {
-        let search = SearchStore.migrateLegacyPreferences()[0]
-        await sendNotificationIfNeeded(availableParts: availableParts, skuData: skuData, search: search)
-    }
 }

@@ -61,7 +61,7 @@ struct ContentView: View {
         }
         .onChange(of: model.selectedSearchID) { _ in
             Task {
-                await model.updateStoreName()
+                await model.loadStores()
                 if let selected = model.selectedSearch {
                     _ = await model.skuData(for: selected.productType)
                     if model.results[selected.id] == nil { await model.fetchSelected() }

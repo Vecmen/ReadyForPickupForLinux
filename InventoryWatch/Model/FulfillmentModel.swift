@@ -12,12 +12,6 @@ actor FulfillmentModel {
     let defaultsVendor = DefaultsVendor()
     let skuDataLoader = SKUDataLoader()
 
-    var skuDataForPreferredProduct: SKUData {
-        get async throws {
-            return try await skuDataLoader.skuDataForPreferredProduct
-        }
-    }
-
     func skuData(for search: SavedSearch) async throws -> SKUData {
         try await skuDataLoader.skuData(for: search.productType, and: defaultsVendor.preferredCountry)
     }
@@ -71,11 +65,6 @@ actor FulfillmentModel {
             throw AppError.invalidProjectState
         }
         return stores
-    }
-
-    /// Legacy single-search entry point (kept for compatibility).
-    func fetchInventory() async throws -> [(FulfillmentStore, [PartAvailability])] {
-        try await fetchInventory(for: SearchStore.migrateLegacyPreferences()[0])
     }
 
     /// Fetches inventory for one saved search against Apple's current
@@ -134,21 +123,6 @@ actor FulfillmentModel {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         return try parseStoreResponse(data, response: response as? HTTPURLResponse, skuData: skuData, search: search)
-    }
-
-    func getDefaultStoreForCurrentCountry() async throws -> RetailStore? {
-        let stores = try await storesForPreferredCountry()
-        let defaultStoreNumber: String
-        switch defaultsVendor.preferredCountry.locale {
-        case "en_US": defaultStoreNumber = "R032"
-        case "fr_FR": defaultStoreNumber = "R277"
-        case "en_CA": defaultStoreNumber = "R121"
-        case "en_AU": defaultStoreNumber = "R238"
-        case "de_DE": defaultStoreNumber = "R443"
-        case "en_GB": defaultStoreNumber = "R092"
-        default: return stores.first
-        }
-        return stores.first(where: { $0.storeNumber == defaultStoreNumber }) ?? stores.first
     }
 
     /// pickup-message takes a city / postal-code `location`, not an

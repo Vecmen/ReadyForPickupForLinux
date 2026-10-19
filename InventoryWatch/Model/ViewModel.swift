@@ -37,11 +37,6 @@ final class ViewModel: ObservableObject {
     private var throttleFailureCount = 0
     private var lastNotifiedPreferredKeys: [UUID: Set<String>] = [:]
 
-    // Legacy published state kept for the app scene / commands.
-    @Published var availableParts: [(FulfillmentStore, [PartAvailability])] = []
-    @Published var errorState: AppError?
-    @Published var preferredStoreName: String? = nil
-
     /// Allowed auto-refresh intervals in minutes (0 = Off).
     static let allowedIntervals = [0, 5, 10, 15, 30]
 
@@ -107,13 +102,6 @@ final class ViewModel: ObservableObject {
         } catch {
             print(error)
             return nil
-        }
-    }
-
-    var storesForCurrentCountry: [RetailStore] {
-        get async {
-            await loadStores()
-            return stores
         }
     }
 
@@ -268,10 +256,6 @@ final class ViewModel: ObservableObject {
             results[search.id] = parts
             lastUpdated[search.id] = Date()
             searchErrors[search.id] = nil
-            if search.id == selectedSearch?.id {
-                availableParts = parts
-                errorState = nil
-            }
             throttleFailureCount = 0
             throttledUntil = nil
             notifyIfNeeded(search: search, parts: parts)
@@ -291,9 +275,6 @@ final class ViewModel: ObservableObject {
                 message = (error as? AppError)?.errorMessage ?? error.localizedDescription
             }
             searchErrors[search.id] = message
-            if search.id == selectedSearch?.id {
-                errorState = error as? AppError ?? .generic(error)
-            }
             print(error)
         }
     }
@@ -340,21 +321,5 @@ final class ViewModel: ObservableObject {
                 }
             }
         }
-    }
-
-    func clearCurrentAvailableParts() {
-        availableParts = []
-        if let id = selectedSearch?.id { results[id] = [] }
-    }
-
-    func updateStoreName() async {
-        await loadStores()
-        if let search = selectedSearch {
-            preferredStoreName = storeName(for: search)
-        }
-    }
-
-    func getDefaultStoreForCurrentCountry() async -> RetailStore? {
-        try? await fulfillmentModel.getDefaultStoreForCurrentCountry()
     }
 }
