@@ -48,11 +48,13 @@ actor FulfillmentModel {
             print(error)
         }
 
-        // If remote stores failed to load, fallback to local bootstrap
+        // If remote stores failed to load, fallback to local bootstrap.
+        // Cache it too, or every fetch re-requests the failing remote list.
         if let path = Bundle.main.path(forResource: "Stores_LocalBootstrap", ofType: "json") {
             do {
                 let data = try Data(contentsOf: URL(fileURLWithPath: path))
                 let jsonStores = try decoder.decode(StoreBootstrap.self, from: data)
+                cachedStoreData = jsonStores.countryData
                 return jsonStores.countryData
             } catch {
                 print(error)
