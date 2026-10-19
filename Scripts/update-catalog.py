@@ -379,8 +379,10 @@ def verify(client: AppleClient, host: str, path: str, stores: list, skus: list,
             parsed, error = parse_pickup(resp)
             if parsed or result["location"]:
                 break
-            # Nothing has worked yet: this location may be the problem.
             result["errors"].append(f"{store_id} location {location!r}: {error}")
+            if resp.status in (403, 404):
+                return result       # no pickup API on this storefront at all
+            # Nothing has worked yet: this location may be the problem.
             attempt += 1
         if not parsed:
             result["errors"].append(f"parts {start}-{start + len(chunk) - 1}: {error}")
