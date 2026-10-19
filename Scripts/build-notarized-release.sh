@@ -102,10 +102,12 @@ spctl -a -vvv -t open --context context:primary-signature "$DMG" || true
 mkdir -p "$WORK/appcast"
 cp "$DMG" "$WORK/appcast/"
 cp appcast.xml "$WORK/appcast/appcast.xml" 2>/dev/null || true
+# No -o: with it, generate_appcast reads the existing feed from the -o path
+# (empty here), drops earlier items, and leaves the copy below stale.
 "$SPARKLE_TOOLS/generate_appcast" \
   --download-url-prefix "https://github.com/wehbs/ReadyForPickup/releases/download/v$VERSION/" \
-  -o "$WORK/appcast-out.xml" "$WORK/appcast"
-# generate_appcast writes into the archives dir; prefer its appcast.xml
+  "$WORK/appcast"
+# generate_appcast updates appcast.xml in the archives dir; copy it back
 if [[ -f "$WORK/appcast/appcast.xml" ]]; then cp "$WORK/appcast/appcast.xml" ./appcast.xml; fi
 python3 -c "import xml.dom.minidom,sys; xml.dom.minidom.parse('appcast.xml'); print('appcast.xml: well-formed XML')"
 shasum -a 256 "$DMG"
