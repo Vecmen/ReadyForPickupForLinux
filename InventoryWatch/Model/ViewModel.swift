@@ -325,9 +325,11 @@ final class ViewModel: ObservableObject {
             return fresh.isEmpty ? nil : (store, fresh)
         }
 
-        if search.notifyOnThisMac, let skuData = skuDataByProduct[search.productType] {
+        // Not gated on skuDataByProduct: that cache only holds product
+        // types opened in the UI, and part names are already resolved.
+        if search.notifyOnThisMac {
             Task {
-                await NotificationSender().sendNotificationIfNeeded(availableParts: newParts, skuData: skuData, search: search)
+                await NotificationSender().sendNotificationIfNeeded(availableParts: newParts, search: search)
             }
         }
 
