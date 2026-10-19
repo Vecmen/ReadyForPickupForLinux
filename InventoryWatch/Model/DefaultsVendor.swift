@@ -126,32 +126,3 @@ struct DefaultsVendor {
         UserDefaults.standard.bool(forKey: "notifyOnlyForPreferredModels")
     }
 }
-
-/// One-time migration from the old bundle ID (com.worthbak.InventoryWatch)
-/// to com.wehbs.ReadyForPickup. Changing PRODUCT_BUNDLE_IDENTIFIER changes
-/// the UserDefaults domain, so without this, savedSearches and every
-/// legacy preference (preferredStoreNumber, preferredSKUs, Pushover
-/// enable flag, Sparkle settings, etc.) would appear empty on first launch
-/// of the renamed app. Copies only keys missing in the new domain, then
-/// records completion. Pushover keys are deliberately not migrated: they
-/// live in the old app's Keychain items, and macOS asks for the login
-/// password whenever a different app reads those, so users re-enter them.
-enum LegacyDataMigration {
-    static let legacyBundleIdentifier = "com.worthbak.InventoryWatch"
-    private static let migrationKey = "legacyDataMigrationCompletedV1"
-
-    static func migrateIfNeeded() {
-        let standard = UserDefaults.standard
-
-        if standard.bool(forKey: migrationKey) == false {
-            if let legacy = UserDefaults(suiteName: legacyBundleIdentifier) {
-                for (key, value) in legacy.dictionaryRepresentation()
-                where standard.object(forKey: key) == nil {
-                    standard.set(value, forKey: key)
-                }
-            }
-            standard.set(true, forKey: migrationKey)
-            _ = standard.synchronize()
-        }
-    }
-}
