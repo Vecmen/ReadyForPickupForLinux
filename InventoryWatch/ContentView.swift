@@ -12,17 +12,13 @@ struct ContentView: View {
 
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showInspector = true
-    @State private var confirmDelete = false
+    @State private var searchPendingDeletion: SavedSearch?
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
-        } content: {
-            centerPane
         } detail: {
-            if showInspector {
-                inspector
-            }
+            resultsAndInspector
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
@@ -34,18 +30,22 @@ struct ContentView: View {
                 Button { Task { await model.fetchSelected() } } label: { Image(systemName: "arrow.clockwise") }
                     .help("Refresh selected search")
                     .keyboardShortcut("r", modifiers: .command)
-                Button(role: .destructive) { confirmDelete = true } label: { Image(systemName: "trash") }
+                Button(role: .destructive) { searchPendingDeletion = model.selectedSearch } label: { Image(systemName: "trash") }
                     .help("Delete selected search")
                     .disabled(model.selectedSearch == nil)
                 Button { withAnimation { showInspector.toggle() } } label: { Image(systemName: "sidebar.trailing") }
                     .help("Toggle inspector")
             }
         }
-        .confirmationDialog("Delete this search?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete Search", role: .destructive) { model.deleteSelectedSearch() }
+        .confirmationDialog("Delete this search?",
+                            isPresented: Binding(get: { searchPendingDeletion != nil },
+                                                 set: { if $0 == false { searchPendingDeletion = nil } }),
+                            titleVisibility: .visible,
+                            presenting: searchPendingDeletion) { search in
+            Button("Delete Search", role: .destructive) { model.deleteSearch(id: search.id) }
             Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This removes the saved search and its preferences. This cannot be undone.")
+        } message: { search in
+            Text("This removes “\(search.productType.presentableName) at \(model.storeName(for: search))” and its preferences. This cannot be undone.")
         }
         .task {
             await model.loadStores()
@@ -97,6 +97,16 @@ struct ContentView: View {
                                 .background(Capsule().fill(Color.secondary.opacity(0.25)))
                         }
                     }
+                    .contentShape(Rectangle())
+                    // Acts on the clicked row, which may not be the selected one.
+                    .contextMenu {
+                        Button { Task { await model.refreshSearch(id: search.id) } } label: {
+                            Label("Refresh Search", systemImage: "arrow.clockwise")
+                        }
+                        Button(role: .destructive) { searchPendingDeletion = search } label: {
+                            Label("Delete Search…", systemImage: "trash")
+                        }
+                    }
                     .tag(search.id)
                 }
             }
@@ -117,6 +127,30 @@ struct ContentView: View {
     }
 
     // MARK: - Center
+
+    /// The inspector hangs off the results pane instead of being a third
+    /// split-view column: NavigationSplitView can only collapse its leading
+    /// columns, so toggling a detail-column inspector just blanked it.
+    @ViewBuilder
+    private var resultsAndInspector: some View {
+        if #available(macOS 14.0, *) {
+            centerPane
+                .inspector(isPresented: $showInspector) {
+                    inspector
+                        .inspectorColumnWidth(min: 260, ideal: 300, max: 360)
+                }
+        } else {
+            // No .inspector on macOS 13: lay it out beside the results.
+            HStack(spacing: 0) {
+                centerPane
+                if showInspector {
+                    Divider()
+                    inspector
+                        .frame(width: 300)
+                }
+            }
+        }
+    }
 
     private var centerPane: some View {
         Group {
@@ -244,7 +278,6 @@ struct ContentView: View {
                 Text("No search selected.").foregroundColor(.secondary).padding()
             }
         }
-        .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
     }
 
     private func banner(for search: SavedSearch) -> some View {

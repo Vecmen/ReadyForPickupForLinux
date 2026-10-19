@@ -11,7 +11,7 @@ struct NotificationSender {
 
     /// Local Mac notification only (this app has no text/email service).
     /// Sends when a preferred model (or custom SKU) is available.
-    func sendNotificationIfNeeded(availableParts: [(FulfillmentStore, [PartAvailability])], skuData: SKUData, search: SavedSearch) async {
+    func sendNotificationIfNeeded(availableParts: [(FulfillmentStore, [PartAvailability])], search: SavedSearch) async {
         guard search.notifyOnThisMac else { return }
         let preferred = availableParts.flatMap { store, parts in
             parts.filter { search.isPreferred($0) }.map { (store, $0) }
