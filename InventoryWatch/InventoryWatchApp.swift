@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct InventoryWatchApp: App {
     @StateObject var model = ViewModel()
+    @StateObject private var updater = UpdaterViewModel()
     
     var body: some Scene {
         WindowGroup {
@@ -18,6 +19,9 @@ struct InventoryWatchApp: App {
         }
         .defaultSize(width: 1280, height: 800)
         .commands {
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesView(updater: updater)
+            }
             CommandGroup(replacing: .newItem) {
                 Button(action: {
                     Task { await model.fetchLatestInventory() }
@@ -31,6 +35,7 @@ struct InventoryWatchApp: App {
         Settings {
             SettingsView()
                 .environmentObject(model)
+                .environmentObject(updater)
         }
     }
 }

@@ -11,6 +11,7 @@ import SwiftUI
 /// (2.0-style layout). This scene keeps only app-wide preferences.
 struct SettingsView: View {
     @EnvironmentObject var model: ViewModel
+    @EnvironmentObject var updater: UpdaterViewModel
     @AppStorage("preferredCountry") private var preferredCountry = "US"
     @AppStorage("useLargeText") private var useLargeText: Bool = false
     @AppStorage("preferredUpdateInterval") private var preferredUpdateInterval: Int = 5
@@ -46,6 +47,16 @@ struct SettingsView: View {
                 .font(.caption).foregroundColor(.secondary)
 
             Toggle("Use larger text sizes", isOn: $useLargeText)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Software Updates").font(.headline)
+                Toggle("Automatically check for updates", isOn: $updater.automaticallyChecksForUpdates)
+                CheckForUpdatesView(updater: updater)
+                Text("Updates are downloaded from GitHub via Sparkle. Version 0.3.1 and earlier must be updated manually one last time to 0.3.2.")
+                    .font(.caption).foregroundColor(.secondary)
+            }
 
             Divider()
 

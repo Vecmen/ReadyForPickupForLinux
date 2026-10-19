@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>InventoryWatch</title>
+    <link>https://raw.githubusercontent.com/wehbs/inventory-checker-app/main/appcast.xml</link>
+    <description>InventoryWatch updates (Sparkle). First auto-updating release is 0.3.2; 0.3.1 and earlier cannot self-update.</description>
+    <language>en</language>
+  </channel>
+</rss>
