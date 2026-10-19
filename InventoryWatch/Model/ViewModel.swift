@@ -204,7 +204,7 @@ final class ViewModel: ObservableObject {
         autoRefreshTask = Task { [weak self] in
             while Task.isCancelled == false {
                 guard let self else { return }
-                let delay = await self.currentAutoRefreshDelay()
+                let delay = self.currentAutoRefreshDelay()
                 let next = Date().addingTimeInterval(delay)
                 await MainActor.run { self.nextAutoRefreshAt = next }
                 print("[AutoRefresh] next refresh in \(Int(delay))s at \(next)")
