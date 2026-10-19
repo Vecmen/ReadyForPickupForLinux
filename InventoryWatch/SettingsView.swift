@@ -13,7 +13,6 @@ struct SettingsView: View {
     @EnvironmentObject var model: ViewModel
     @EnvironmentObject var updater: UpdaterViewModel
     @AppStorage("preferredCountry") private var preferredCountry = "US"
-    @AppStorage("useLargeText") private var useLargeText: Bool = false
     @AppStorage("preferredUpdateInterval") private var preferredUpdateInterval: Int = 5
     @State private var pushoverUserKey: String = PushoverSettings.userKey
     @State private var pushoverApiToken: String = PushoverSettings.apiToken
@@ -43,10 +42,8 @@ struct SettingsView: View {
                 // Apple is throttling requests.
                 model.restartAutoRefresh(withMinutes: newValue)
             }
-            Text("Searches refresh automatically while the app is running, one after another. Use the toolbar refresh button (or Cmd-R) to re-check now - that also resets the schedule.")
+            Text("Searches refresh automatically, one after another, while the app is running - even with its window closed. To re-check now, use the toolbar refresh button or File > Refresh Selected Search (Cmd-R), or File > Refresh All Searches (Shift-Cmd-R); either also resets the schedule.")
                 .font(.caption).foregroundColor(.secondary)
-
-            Toggle("Use larger text sizes", isOn: $useLargeText)
 
             Divider()
 
@@ -54,7 +51,7 @@ struct SettingsView: View {
                 Text("Software Updates").font(.headline)
                 Toggle("Automatically check for updates", isOn: $updater.automaticallyChecksForUpdates)
                 CheckForUpdatesView(updater: updater)
-                Text("Updates are downloaded from GitHub via Sparkle. Version 0.3.1 and earlier must be updated manually one last time to 0.3.2.")
+                Text("Updates are downloaded from GitHub via Sparkle. Version 0.3.2 and earlier can't install updates: download 0.3.3 or later once from the Releases page.")
                     .font(.caption).foregroundColor(.secondary)
             }
 

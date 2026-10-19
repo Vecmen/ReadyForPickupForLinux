@@ -18,7 +18,7 @@ enum AppError: Swift.Error, LocalizedError {
     case unexpectedJSONStructure
     
     var errorDescription: String? {
-        return "\(self)"
+        return errorMessage
     }
     
     var errorMessage: String {

@@ -18,9 +18,12 @@ final class ViewModel: ObservableObject {
     @Published var results: [UUID: [(FulfillmentStore, [PartAvailability])]] = [:]
     @Published var lastUpdated: [UUID: Date] = [:]
     @Published var searchErrors: [UUID: String] = [:]
-    @Published var isLoading = false
     @Published var stores: [RetailStore] = []
     @Published var skuDataByProduct: [ProductType: SKUData] = [:]
+
+    // Fetches in flight per search. A count, not a flag: one search
+    // can be fetched twice at once (e.g. edited during a sweep).
+    @Published private var fetchesInFlight: [UUID: Int] = [:]
 
     // Auto-refresh (minutes; 0 = Off). Backed by legacy
     // `preferredUpdateInterval`; only 0/5/10/15/30 are honoured -
@@ -34,6 +37,8 @@ final class ViewModel: ObservableObject {
     @Published var pushoverFeedback: String?
 
     private var autoRefreshTask: Task<Void, Never>?
+    private var sweepTask: Task<Void, Never>?
+    private var isMonitoring = false
     private var throttleFailureCount = 0
     private var lastNotifiedPreferredKeys: [UUID: Set<String>] = [:]
 
@@ -77,6 +82,13 @@ final class ViewModel: ObservableObject {
         }
     }
 
+    /// Any fetch in flight (toolbar spinner).
+    var isLoading: Bool { fetchesInFlight.isEmpty == false }
+
+    func isFetching(_ search: SavedSearch) -> Bool {
+        fetchesInFlight[search.id] != nil
+    }
+
     // MARK: - Stores & SKU data
 
     func loadStores() async {
@@ -114,12 +126,16 @@ final class ViewModel: ObservableObject {
         searches.append(search)
         selectedSearchID = search.id
         SearchStore.save(searches)
-        Task { await fetch(search: search) }
+        Task { await refreshSearch(id: search.id) }
     }
 
     func deleteSearch(id: UUID) {
         searches.removeAll { $0.id == id }
+        // A fetch still in flight for it drops its results (see fetch).
         results[id] = nil
+        lastUpdated[id] = nil
+        searchErrors[id] = nil
+        lastNotifiedPreferredKeys[id] = nil
         // Deleting from the sidebar menu can target an unselected search;
         // only move the selection when the selected one went away.
         if searches.contains(where: { $0.id == selectedSearchID }) == false {
@@ -142,6 +158,16 @@ final class ViewModel: ObservableObject {
 
     // MARK: - Fetching
 
+    /// Called on every main-window appearance; only the first one starts
+    /// monitoring (a sweep now, then auto-refresh). Monitoring then runs
+    /// for the life of the app: closing the window doesn't stop it, and
+    /// reopening one doesn't start a second schedule.
+    func startMonitoring() async {
+        guard isMonitoring == false else { return }
+        isMonitoring = true
+        await fetchAllSearches()
+    }
+
     func fetchSelected() async {
         guard let search = selectedSearch else { return }
         await refreshSearch(id: search.id)
@@ -151,39 +177,60 @@ final class ViewModel: ObservableObject {
     /// any manual refresh, it reschedules auto-refresh.
     func refreshSearch(id: UUID) async {
         guard let search = searches.first(where: { $0.id == id }) else { return }
-        await fetch(search: search)
+        if let statusCode = await fetch(search: search) {
+            registerThrottle(statusCode: statusCode, searchID: id)
+        }
         restartAutoRefresh()
     }
 
+    /// Manual refresh of every search (File menu, first launch).
     func fetchAllSearches() async {
-        await fetchAllSequentially()
+        await sweep()
         restartAutoRefresh()
+    }
+
+    /// Runs a sweep, or joins the one already running: manual refreshes
+    /// and the auto-refresh loop share it, so only one sweep runs at a
+    /// time. It runs in its own task, which nothing cancels.
+    private func sweep() async {
+        if let sweepTask {
+            await sweepTask.value
+            return
+        }
+        let task = Task {
+            await fetchAllSequentially()
+            sweepTask = nil
+        }
+        sweepTask = task
+        await task.value
     }
 
     /// Sequential by design (no parallel bursts against Apple's API),
-    /// with a small stagger between searches.
+    /// with a small stagger between searches. A throttled response ends
+    /// the sweep; a sweep that finishes unthrottled clears the backoff.
     private func fetchAllSequentially() async {
-        for (index, search) in searches.enumerated() {
+        for (index, id) in searches.map(\.id).enumerated() {
             if index > 0 {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
-            // restartAutoRefresh()/stopAutoRefresh() cancel the loop's sweep.
-            if Task.isCancelled { return }
-            await fetch(search: search)
+            // Read it now: searches can be edited or deleted mid-sweep.
+            guard let search = searches.first(where: { $0.id == id }) else { continue }
+            if let statusCode = await fetch(search: search) {
+                registerThrottle(statusCode: statusCode, searchID: id)
+                return
+            }
         }
-    }
-
-    /// Cmd-R / legacy entry point.
-    func fetchLatestInventory() async {
-        await fetchAllSearches()
+        throttleFailureCount = 0
+        throttledUntil = nil
     }
 
     // MARK: - Auto-refresh scheduler
 
     /// (Re)starts the Task.sleep-based scheduler. Idempotent: any
-    /// previous loop is cancelled first, so view re-appearances and
-    /// settings changes never stack timers. Changing the interval or
-    /// turning it Off takes effect immediately, without relaunch.
+    /// previous loop is cancelled first, so settings changes and manual
+    /// refreshes never stack timers; a sweep already running carries on.
+    /// Changing the interval or turning it Off takes effect immediately,
+    /// without relaunch.
     func restartAutoRefresh(withMinutes minutes: Int? = nil) {
         if let minutes {
             autoRefreshIntervalMinutes = Self.allowedIntervals.contains(minutes) ? minutes : 5
@@ -204,11 +251,11 @@ final class ViewModel: ObservableObject {
                 guard let self else { return }
                 let delay = self.currentAutoRefreshDelay()
                 let next = Date().addingTimeInterval(delay)
-                await MainActor.run { self.nextAutoRefreshAt = next }
+                self.nextAutoRefreshAt = next
                 print("[AutoRefresh] next refresh in \(Int(delay))s at \(next)")
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 if Task.isCancelled { return }
-                await self.fetchAllSequentially()
+                await self.sweep()
             }
         }
         print("[AutoRefresh] started, every \(autoRefreshIntervalMinutes) min")
@@ -238,55 +285,71 @@ final class ViewModel: ObservableObject {
         refreshPushoverState()
     }
 
-    func stopAutoRefresh() {
-        autoRefreshTask?.cancel()
-        autoRefreshTask = nil
-        nextAutoRefreshAt = nil
-    }
-
-    /// Base interval, extended by exponential throttle backoff
-    /// (x2 per consecutive throttled cycle, capped at 60 min).
+    /// The refresh interval, or longer while Apple is throttling.
     private func currentAutoRefreshDelay() -> TimeInterval {
-        let base = TimeInterval(autoRefreshIntervalMinutes * 60)
-        var delay = base
-        if throttleFailureCount > 0 {
-            delay = min(3600, base * pow(2.0, Double(min(throttleFailureCount, 4))))
-        }
-        if let throttledUntil, throttledUntil > Date() {
+        var delay = TimeInterval(autoRefreshIntervalMinutes * 60)
+        if let throttledUntil {
             delay = max(delay, throttledUntil.timeIntervalSinceNow)
         }
         return delay
     }
 
-    func fetch(search: SavedSearch) async {
-        isLoading = true
-        defer { isLoading = false }
+    /// Counts one throttled cycle (a sweep, or a single-search refresh)
+    /// and holds auto-refresh back until `throttledUntil`: the interval
+    /// (5 min when auto-refresh is Off) doubles per consecutive
+    /// throttled cycle, capped at 60 min.
+    private func registerThrottle(statusCode: Int, searchID: UUID) {
+        throttleFailureCount += 1
+        let base = TimeInterval(max(autoRefreshIntervalMinutes, 5) * 60)
+        let backoff = min(3600, base * pow(2.0, Double(min(throttleFailureCount, 4))))
+        let retryAt = Date().addingTimeInterval(backoff)
+        throttledUntil = retryAt
+
+        guard searches.contains(where: { $0.id == searchID }) else { return }
+        let mins = Int((backoff / 60).rounded(.up))
+        let time = retryAt.formatted(date: .omitted, time: .shortened)
+        searchErrors[searchID] = autoRefreshIntervalMinutes > 0
+            ? "Apple is throttling requests (HTTP \(statusCode)); retrying in ~\(mins) min (next retry at \(time))."
+            : "Apple is throttling requests (HTTP \(statusCode)). Auto-refresh is off: wait ~\(mins) min (until \(time)) before refreshing."
+    }
+
+    /// Fetches one search and shows its results or error. Returns the
+    /// HTTP status code when Apple throttled the request, for the caller
+    /// to count once per cycle (registerThrottle).
+    private func fetch(search: SavedSearch) async -> Int? {
+        fetchesInFlight[search.id, default: 0] += 1
+        defer {
+            let remaining = (fetchesInFlight[search.id] ?? 1) - 1
+            fetchesInFlight[search.id] = remaining > 0 ? remaining : nil
+        }
         do {
             let parts = try await fulfillmentModel.fetchInventory(for: search)
+            guard let current = currentVersion(of: search) else { return nil }
             results[search.id] = parts
             lastUpdated[search.id] = Date()
             searchErrors[search.id] = nil
-            throttleFailureCount = 0
-            throttledUntil = nil
-            notifyIfNeeded(search: search, parts: parts)
+            notifyIfNeeded(search: current, parts: parts)
+            return nil
         } catch {
             // URLSession throws URLError(.cancelled) when the calling task
-            // is cancelled; a superseded sweep is not a fetch failure.
-            if Task.isCancelled { return }
-            let message: String
-            if case AppError.throttled(let statusCode) = error {
-                throttleFailureCount += 1
-                let backoff = min(3600, TimeInterval(autoRefreshIntervalMinutes * 60) * pow(2.0, Double(min(throttleFailureCount, 4))))
-                let retryAt = Date().addingTimeInterval(backoff)
-                throttledUntil = retryAt
-                let mins = Int((backoff / 60).rounded(.up))
-                message = "Apple is throttling requests (HTTP \(statusCode)); retrying in ~\(mins) min (next retry at \(retryAt.formatted(date: .omitted, time: .shortened)))."
-            } else {
-                message = (error as? AppError)?.errorMessage ?? error.localizedDescription
-            }
-            searchErrors[search.id] = message
+            // is cancelled; a cancelled fetch is not a failure.
+            if Task.isCancelled { return nil }
             print(error)
+            if case AppError.throttled(let statusCode) = error { return statusCode }
+            if currentVersion(of: search) != nil {
+                searchErrors[search.id] = error.localizedDescription
+            }
+            return nil
         }
+    }
+
+    /// The search as it is now, or nil if it was deleted, or pointed at
+    /// other inventory, while `search` was being fetched (that edit
+    /// started a fetch of its own).
+    private func currentVersion(of search: SavedSearch) -> SavedSearch? {
+        guard let current = searches.first(where: { $0.id == search.id }),
+              current.requestsSameInventory(as: search) else { return nil }
+        return current
     }
 
     private func notifyIfNeeded(search: SavedSearch, parts: [(FulfillmentStore, [PartAvailability])]) {

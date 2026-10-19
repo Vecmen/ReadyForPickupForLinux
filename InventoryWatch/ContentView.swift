@@ -27,9 +27,9 @@ struct ContentView: View {
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 if model.isLoading { ProgressView().controlSize(.small) }
+                // No shortcut here: Cmd-R is File > Refresh Selected Search.
                 Button { Task { await model.fetchSelected() } } label: { Image(systemName: "arrow.clockwise") }
-                    .help("Refresh selected search")
-                    .keyboardShortcut("r", modifiers: .command)
+                    .help("Refresh selected search (Cmd-R)")
                 Button(role: .destructive) { searchPendingDeletion = model.selectedSearch } label: { Image(systemName: "trash") }
                     .help("Delete selected search")
                     .disabled(model.selectedSearch == nil)
@@ -52,19 +52,19 @@ struct ContentView: View {
             if let selected = model.selectedSearch {
                 _ = await model.skuData(for: selected.productType)
             }
-            await model.fetchAllSearches()
-            model.restartAutoRefresh()
             NotificationManager.shared.requestNotificationPermissions()
-        }
-        .onDisappear {
-            model.stopAutoRefresh()
+            // Only the first window starts monitoring; it keeps running
+            // after the window closes, so a reopened one doesn't restart it.
+            await model.startMonitoring()
         }
         .onChange(of: model.selectedSearchID) { _ in
             Task {
                 await model.loadStores()
                 if let selected = model.selectedSearch {
                     _ = await model.skuData(for: selected.productType)
-                    if model.results[selected.id] == nil { await model.fetchSelected() }
+                    if model.results[selected.id] == nil, model.isFetching(selected) == false {
+                        await model.fetchSelected()
+                    }
                 }
             }
         }
@@ -81,7 +81,7 @@ struct ContentView: View {
                             .foregroundColor(.secondary)
                             .frame(width: 18)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("\(search.productType.presentableName) at \(model.storeName(for: search))")
+                            Text(search.productType.presentableName)
                                 .lineLimit(1)
                             Text("at \(model.storeName(for: search))")
                                 .font(.caption)
@@ -188,9 +188,9 @@ struct ContentView: View {
                         VStack(spacing: 8) {
                             Spacer()
                             Image(systemName: "magnifyingglass").font(.largeTitle).foregroundColor(.secondary)
-                            Text(model.isLoading ? "Checking inventory…" : "No models available in-store.")
+                            Text(model.isFetching(search) ? "Checking inventory…" : "No models available in-store.")
                                 .foregroundColor(.secondary)
-                            if model.searchErrors[search.id] == nil && model.isLoading == false {
+                            if model.searchErrors[search.id] == nil && model.isFetching(search) == false {
                                 Text("Available models for this search will appear here, grouped by store.")
                                     .font(.caption).foregroundColor(.secondary)
                             }

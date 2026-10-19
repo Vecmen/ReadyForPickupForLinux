@@ -85,6 +85,14 @@ struct SavedSearch: Codable, Identifiable, Equatable {
     func isPreferred(_ part: PartAvailability) -> Bool {
         preferredSKUs.contains(part.partNumber) || customSkuData?.sku == part.partNumber
     }
+
+    /// Whether a fetch made for `other` (an earlier copy) is still current
+    /// for this search. A new product, store or results filter makes it
+    /// stale (each of those edits starts its own fetch); other edits don't.
+    func requestsSameInventory(as other: SavedSearch) -> Bool {
+        productTypeRaw == other.productTypeRaw && storeNumber == other.storeNumber
+            && includeNearby == other.includeNearby && onlyPreferred == other.onlyPreferred
+    }
 }
 
 /// UserDefaults-backed store for saved searches, with one-time

@@ -193,9 +193,10 @@ actor FulfillmentModel {
     }
 
     private func parseAvailableModels(from stores: [FulfillmentStore], filterForModels: Set<String>?, search: SavedSearch) -> [(FulfillmentStore, [PartAvailability])] {
-        let scoped = search.includeNearby ? stores : stores.filter { $0.storeNumber == search.storeNumber }
+        // The search's own store first, the rest in the order Apple sent.
+        let own = stores.filter { $0.storeNumber == search.storeNumber }
+        let scoped = search.includeNearby ? own + stores.filter { $0.storeNumber != search.storeNumber } : own
         return scoped
-            .sorted(by: { first, _ in first.storeNumber == search.storeNumber })
             .compactMap { store in
                 let rv = store.partsAvailability.filter { part in
                     guard part.availability == .available else { return false }
