@@ -11,6 +11,7 @@ import Combine
 import Sparkle
 import SwiftUI
 
+@MainActor
 final class UpdaterViewModel: ObservableObject {
     let updaterController: SPUStandardUpdaterController
 

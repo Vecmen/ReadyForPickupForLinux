@@ -12,7 +12,6 @@
 		385886AF290827D6003D3C80 /* SKUDataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886AE290827D6003D3C80 /* SKUDataLoader.swift */; };
 		385886B12908280E003D3C80 /* FulfillmentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886B02908280E003D3C80 /* FulfillmentModel.swift */; };
 		38E20B012A6B0001000000D1 /* PushoverClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E20B022A6B0001000000D1 /* PushoverClient.swift */; };
-		385886B32908281F003D3C80 /* GithubModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886B22908281F003D3C80 /* GithubModel.swift */; };
 		385886B529082831003D3C80 /* ViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886B429082831003D3C80 /* ViewModel.swift */; };
 		385886B72908283F003D3C80 /* DefaultsVendor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886B62908283F003D3C80 /* DefaultsVendor.swift */; };
 		386FDC572739DA7300C1BAC2 /* InventoryWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 386FDC562739DA7300C1BAC2 /* InventoryWatchApp.swift */; };
@@ -26,13 +25,11 @@
 		3885D5502891714400BD6A78 /* ProductType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D54F2891714400BD6A78 /* ProductType.swift */; };
 		3885D5522891718600BD6A78 /* AllPhoneModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D5512891718600BD6A78 /* AllPhoneModels.swift */; };
 		38E20A012A6B0001000000C1 /* SavedSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E20A022A6B0001000000C1 /* SavedSearch.swift */; };
-		3885D5542891719600BD6A78 /* GithubTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D5532891719600BD6A78 /* GithubTag.swift */; };
 		3891902D28E882070051FE3A /* Stores_LocalBootstrap.json in Resources */ = {isa = PBXBuildFile; fileRef = 3891902C28E882070051FE3A /* Stores_LocalBootstrap.json */; };
 		38E18B012A6B0001000000B1 /* iPhoneModelsCurrent-intl.json in Resources */ = {isa = PBXBuildFile; fileRef = 38E18B022A6B0001000000B1 /* iPhoneModelsCurrent-intl.json */; };
 		3891902F28E8831B0051FE3A /* StoreBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3891902E28E8831B0051FE3A /* StoreBootstrap.swift */; };
 		3895BE94290B101B00FBC188 /* NotificationSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3895BE93290B101B00FBC188 /* NotificationSender.swift */; };
 		38D0C3A2273C60B500A7DE65 /* Countries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38D0C3A1273C60B500A7DE65 /* Countries.swift */; };
-		38D307DB2745E2E700A0686D /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38D307DA2745E2E700A0686D /* Analytics.swift */; };
 		38E1C21A27E6714E0047703D /* Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E1C21927E6714E0047703D /* Helpers.swift */; };
 		38E4279E273EF542006BF6D7 /* Credits.rtf in Resources */ = {isa = PBXBuildFile; fileRef = 38E4279D273EF542006BF6D7 /* Credits.rtf */; };
 
@@ -46,7 +43,6 @@
 		385886AE290827D6003D3C80 /* SKUDataLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SKUDataLoader.swift; sourceTree = "<group>"; };
 		385886B02908280E003D3C80 /* FulfillmentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FulfillmentModel.swift; sourceTree = "<group>"; };
 		38E20B022A6B0001000000D1 /* PushoverClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushoverClient.swift; sourceTree = "<group>"; };
-		385886B22908281F003D3C80 /* GithubModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GithubModel.swift; sourceTree = "<group>"; };
 		385886B429082831003D3C80 /* ViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModel.swift; sourceTree = "<group>"; };
 		385886B62908283F003D3C80 /* DefaultsVendor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultsVendor.swift; sourceTree = "<group>"; };
 		386FDC532739DA7300C1BAC2 /* InventoryWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = InventoryWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -62,13 +58,11 @@
 		3885D54F2891714400BD6A78 /* ProductType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductType.swift; sourceTree = "<group>"; };
 		3885D5512891718600BD6A78 /* AllPhoneModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllPhoneModels.swift; sourceTree = "<group>"; };
 		38E20A022A6B0001000000C1 /* SavedSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedSearch.swift; sourceTree = "<group>"; };
-		3885D5532891719600BD6A78 /* GithubTag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GithubTag.swift; sourceTree = "<group>"; };
 		3891902C28E882070051FE3A /* Stores_LocalBootstrap.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Stores_LocalBootstrap.json; sourceTree = "<group>"; };
 		38E18B022A6B0001000000B1 /* iPhoneModelsCurrent-intl.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "iPhoneModelsCurrent-intl.json"; sourceTree = "<group>"; };
 		3891902E28E8831B0051FE3A /* StoreBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreBootstrap.swift; sourceTree = "<group>"; };
 		3895BE93290B101B00FBC188 /* NotificationSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSender.swift; sourceTree = "<group>"; };
 		38D0C3A1273C60B500A7DE65 /* Countries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Countries.swift; sourceTree = "<group>"; };
-		38D307DA2745E2E700A0686D /* Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
 		38E1C21927E6714E0047703D /* Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Helpers.swift; sourceTree = "<group>"; };
 		38E4279D273EF542006BF6D7 /* Credits.rtf */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.rtf; path = Credits.rtf; sourceTree = "<group>"; };
 
@@ -97,7 +91,6 @@
 				3885D5512891718600BD6A78 /* AllPhoneModels.swift */,
 				38E20A022A6B0001000000C1 /* SavedSearch.swift */,
 				3885D54D2891713200BD6A78 /* PartAvailability.swift */,
-				3885D5532891719600BD6A78 /* GithubTag.swift */,
 			);
 			path = ModelTypes;
 			sourceTree = "<group>";
@@ -153,10 +146,8 @@
 			children = (
 				385886B429082831003D3C80 /* ViewModel.swift */,
 				386FDC69273A200000C1BAC2 /* NotificationManager.swift */,
-				38D307DA2745E2E700A0686D /* Analytics.swift */,
 				385886AC290827A6003D3C80 /* ModelError.swift */,
 				385886B62908283F003D3C80 /* DefaultsVendor.swift */,
-				385886B22908281F003D3C80 /* GithubModel.swift */,
 				385886AE290827D6003D3C80 /* SKUDataLoader.swift */,
 				385886B02908280E003D3C80 /* FulfillmentModel.swift */,
 				38E20B022A6B0001000000D1 /* PushoverClient.swift */,
@@ -249,7 +240,6 @@
 				3885D54E2891713200BD6A78 /* PartAvailability.swift in Sources */,
 				386FDC68273A18F800C1BAC2 /* SKUData.swift in Sources */,
 				385886B72908283F003D3C80 /* DefaultsVendor.swift in Sources */,
-				38D307DB2745E2E700A0686D /* Analytics.swift in Sources */,
 				386FDC6A273A200000C1BAC2 /* NotificationManager.swift in Sources */,
 				38E1C21A27E6714E0047703D /* Helpers.swift in Sources */,
 				3895BE94290B101B00FBC188 /* NotificationSender.swift in Sources */,
@@ -262,9 +252,7 @@
 				385886AF290827D6003D3C80 /* SKUDataLoader.swift in Sources */,
 				385886B12908280E003D3C80 /* FulfillmentModel.swift in Sources */,
 				38E20B012A6B0001000000D1 /* PushoverClient.swift in Sources */,
-				3885D5542891719600BD6A78 /* GithubTag.swift in Sources */,
 				38D0C3A2273C60B500A7DE65 /* Countries.swift in Sources */,
-				385886B32908281F003D3C80 /* GithubModel.swift in Sources */,
 				3885D5522891718600BD6A78 /* AllPhoneModels.swift in Sources */,
 				38E20A012A6B0001000000C1 /* SavedSearch.swift in Sources */,
 				386FDC572739DA7300C1BAC2 /* InventoryWatchApp.swift in Sources */,
