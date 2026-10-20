@@ -26,9 +26,10 @@ File format (ProductCatalog.json):
 Where the data comes from:
 - US is golden: the SKUs, names and order the app shipped before this file
   existed (SKUData.swift and iPhoneModelsCurrent-intl.json, US-verified
-  2026-10-18). The script never rewrites it; it compares it with the live US
-  buy pages and pickup API and reports drift (new or missing SKUs) instead.
-  The first run seeds it with --us-seed.
+  2026-10-18; the app has read this file instead since). The script never
+  rewrites it; it compares it with the live US buy pages and pickup API and
+  reports drift (new or missing SKUs) instead, so edit the US entry by hand
+  when the US lineup changes. The first run seeds it with --us-seed.
 - iPhones (other countries): every part number in the country's buy pages
   (productSelectionData.products, grouped by familyType), in the order the page
   offers them (its selector sections and their variantOrder). Base part numbers

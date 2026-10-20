@@ -12,11 +12,26 @@ Grab the latest built app from the **[Releases page](https://github.com/wehbs/Re
 
 Forked from worthbak/inventory-checker-app (GPL-3.0)
 
-This is a modernized fork of [worthbak's InventoryWatch](https://github.com/worthbak/inventory-checker-app) (thanks, Worth!). Since the 2023 upstream release it has been updated for macOS 13+, Apple's current pickup API, the current US iPhone/Mac catalog, a 2.0-style three-pane interface with multiple saved searches, auto-refresh with throttle backoff, and Pushover phone notifications (bring your own Pushover app token, entered in Settings). It was renamed from InventoryWatch to ReadyForPickup in October 2026 and relaunched as a new app (bundle ID `com.wehbs.ReadyForPickup`), so nothing carries over from InventoryWatch: saved searches, preferences and Pushover keys start fresh.
+This is a modernized fork of [worthbak's InventoryWatch](https://github.com/worthbak/inventory-checker-app) (thanks, Worth!). Since the 2023 upstream release it has been updated for macOS 13+, Apple's current pickup API, the current iPhone and Mac lineup in 15 countries, a 2.0-style three-pane interface with multiple saved searches, auto-refresh with throttle backoff, and Pushover phone notifications (bring your own Pushover app token, entered in Settings). It was renamed from InventoryWatch to ReadyForPickup in October 2026 and relaunched as a new app (bundle ID `com.wehbs.ReadyForPickup`), so nothing carries over from InventoryWatch: saved searches, preferences and Pushover keys start fresh.
 
 Licensed under GPL-3.0 — see LICENSE.md.
 
 Project site: https://wehbs.github.io/ReadyForPickup/
+
+## Countries
+
+Each search watches one country's stores. Pick the country in the search's inspector, above the store picker: changing it picks a store there and clears that search's preferred models and custom SKU, since part numbers differ by country. **Settings → Default country** sets where new searches start.
+
+Supported: the United States, Australia, Austria, Canada, China mainland, France, Germany, India, Italy, Japan, Malaysia, South Korea, Spain, the United Arab Emirates and the United Kingdom. Every model watched in a country was found in that country's own pickup API. Outside the US, iPhone names are Apple's local ones (e.g. Japanese or French); Mac names are the US spec names. Not supported: Hong Kong (its pickup API rejects the store locations the app sends), Macao (no online store), and Apple's other store countries (Belgium, Brazil, Mexico, the Netherlands, Singapore, Sweden, Switzerland, Taiwan, Thailand and Türkiye) until their models are verified.
+
+## Store list and product catalog
+
+The app bundles two data files, each rebuilt by a script (Python 3.9+, standard library only; `--dry-run` prints the changes without writing):
+
+- `InventoryWatch/Stores_LocalBootstrap.json`: every Apple Store, by country. `Scripts/update-store-list.py` rebuilds it from apple.com/retail/storelist in one request.
+- `InventoryWatch/ProductCatalog.json`: the countries the app offers and the models it watches in each (part number and name). `Scripts/update-catalog.py` rebuilds every country but the US and checks each part number against that country's pickup API. Apple's pickup API blocks a client for about half an hour after roughly 40-60 calls, so refresh a few countries per run, about an hour apart, with the same cache directory: `Scripts/update-catalog.py --only GB,JP,FR,DE --cache-dir ~/rfp-cache`. The US entry is edited by hand: the script checks it against Apple's live US pages and pickup API and reports drift (new or missing SKUs) but never rewrites it, and the other countries' Macs are derived from it.
+
+Run `update-store-list.py` before every release (stores open and close), and before `update-catalog.py`, which checks models at real stores. Run `update-catalog.py` when Apple's lineup changes (new iPhones each September, new Macs) after updating the US entry, or to add a country (see `COUNTRIES` in the script). A new product line also needs a `ProductType` case and an entry in the script's page tables.
 
 ## Auto-updates (Sparkle)
 
@@ -28,7 +43,9 @@ ReadyForPickup uses [Sparkle 2.10.0](https://github.com/sparkle-project/Sparkle)
 
 ## Releasing
 
-Run `Scripts/build-notarized-release.sh` (see its header). It builds, signs Sparkle's nested code then the app, makes the DMG, notarizes (`notarytool submit --wait` — this can take hours; the submission ID is printed — if running detached, poll `xcrun notarytool info <id> --key … --key-id … --issuer …` every ~2 min, and on `Accepted` staple/validate and check `spctl` on the mounted app), staples, then generates/signs `appcast.xml` with Sparkle's `generate_appcast` (fails safe if the Sparkle tools are missing). Then, in order:
+First refresh the bundled data (see [Store list and product catalog](#store-list-and-product-catalog)): run `Scripts/update-store-list.py`, plus `Scripts/update-catalog.py` if Apple's lineup changed, and commit any changes.
+
+Then run `Scripts/build-notarized-release.sh` (see its header). It builds, signs Sparkle's nested code then the app, makes the DMG, notarizes (`notarytool submit --wait` — this can take hours; the submission ID is printed — if running detached, poll `xcrun notarytool info <id> --key … --key-id … --issuer …` every ~2 min, and on `Accepted` staple/validate and check `spctl` on the mounted app), staples, then generates/signs `appcast.xml` with Sparkle's `generate_appcast` (fails safe if the Sparkle tools are missing). Then, in order:
 
 1. Commit + push the version bump: both `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` (Sparkle compares the latter). Don't commit `appcast.xml` yet.
 2. `gh release create v<VERSION> /tmp/readyforpickup-release/ReadyForPickup-<VERSION>.dmg --repo wehbs/ReadyForPickup --target <bump commit SHA> --title "ReadyForPickup <VERSION>" --notes "…"` — **always pass `--repo wehbs/ReadyForPickup`** (`gh` otherwise defaults to the upstream worthbak repo here).
