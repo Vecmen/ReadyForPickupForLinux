@@ -31,7 +31,7 @@ struct ReadyForPickupApp: App {
 
 @MainActor
 enum BackgroundRefresh {
-    static let identifier = "io.readyforpickup.ios.refresh"
+    static let identifier = "com.wehbs.ReadyForPickup.ios.refresh"
     private static var registered = false
 
     static func register(store: WatchStore) {

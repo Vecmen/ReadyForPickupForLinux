@@ -1,4 +1,4 @@
-# Ready for Pickup for iOS
+# ReadyForPickup for iOS
 
 A native iPhone and iPad companion to the macOS Apple Store pickup-availability watcher in this repository.
 

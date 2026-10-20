@@ -1,4 +1,4 @@
-appId: io.readyforpickup.ios
+appId: com.wehbs.ReadyForPickup.ios
 name: Check real Apple pickup availability
 ---
 - launchApp:

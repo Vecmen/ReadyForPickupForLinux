@@ -21,7 +21,7 @@ struct SettingsView: View {
                     Image(systemName: "bag").font(.largeTitle).foregroundStyle(Color.pickupGreen)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("A better way to keep watch.").font(.headline)
-                        Text("Ready for Pickup · iOS").font(.subheadline).foregroundStyle(.secondary)
+                        Text("ReadyForPickup · iOS").font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
                 .padding(.vertical, 8)

@@ -1,4 +1,4 @@
-appId: io.readyforpickup.ios
+appId: com.wehbs.ReadyForPickup.ios
 name: Create persist pause edit and delete a watch
 ---
 - launchApp:

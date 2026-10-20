@@ -39,7 +39,7 @@ final class WatchStore {
     init() {
         demoMode = ProcessInfo.processInfo.arguments.contains("--demo")
         let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
-        let defaults = testing ? UserDefaults(suiteName: "io.readyforpickup.ios.ui-testing")! : .standard
+        let defaults = testing ? UserDefaults(suiteName: "com.wehbs.ReadyForPickup.ios.ui-testing")! : .standard
         preferences = defaults
         catalog = try? Catalog.load()
         defaultCountry = defaults.string(forKey: "defaultCountry") ?? "US"

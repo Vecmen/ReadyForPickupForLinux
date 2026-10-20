@@ -78,7 +78,7 @@ struct WatchesView: View {
             .frame(maxWidth: .infinity)
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle("Ready for Pickup")
+        .navigationTitle("ReadyForPickup")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
