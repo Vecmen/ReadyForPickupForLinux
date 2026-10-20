@@ -61,6 +61,6 @@ For an optional real network check, run `ios/.maestro/live-check.yaml` the same 
 
 ## Data and attribution
 
-The bundled catalog was generated **October 19, 2026** and includes 15 countries. Product and store data are a snapshot, not live stock; part numbers may become obsolete. The bundled product catalog, store list, and app icon are copied from the macOS app at revision `c9f0ba13890689f7b64f99bb63e239bd8ac521aa`. See the [root README](../README.md#store-list-and-product-catalog) for the catalog refresh workflow. After refreshing the macOS data, copy the validated JSON files into `ReadyForPickup/Resources/` and update the snapshot date here. Unknown product-family identifiers remain selectable with their identifier as the display label.
+The app bundles the macOS app's product catalog and store list straight from `../ReadyForPickup/` (`ProductCatalog.json` and `Stores_LocalBootstrap.json`), so refreshing them with the scripts in the [root README](../README.md#store-list-and-product-catalog) updates both apps. Product and store data are a snapshot, not live stock; part numbers may become obsolete. The app icon is drawn by `Scripts/make-app-icon.swift` along with the Mac icon, as an opaque square that iOS rounds itself. Unknown product-family identifiers remain selectable with their identifier as the display label.
 
 Licensed under [GPL-3.0](../LICENSE.md). Independent of and not endorsed by Apple.
