@@ -4,6 +4,8 @@
 //   ReadyForPickup/Assets.xcassets/AppIcon.appiconset/icon_*.png + Contents.json
 //   docs/logo.png (512 px)
 //   docs/favicon.png (64 px, the tile alone, so it fills a browser tab's icon)
+//   ios/ReadyForPickup/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+//     (1024 px, opaque and edge to edge, for the iOS app)
 //
 // The icon is a white paper shopping bag with grey rope handles and a green
 // check on its front, on a blue macOS icon tile. It is drawn from scratch:
@@ -58,7 +60,15 @@ func fillGradient(_ ctx: CGContext, _ path: CGPath, _ from: CGColor, _ to: CGCol
 }
 
 /// The blue tile, with the template's soft drop shadow and a faint top highlight.
-func drawTile(_ ctx: CGContext) {
+/// With `fullBleed`, the tile's colours fill that rect instead, with no shape or
+/// shadow: iOS rounds an app icon's corners itself.
+func drawTile(_ ctx: CGContext, fullBleed: CGRect? = nil) {
+    if let bounds = fullBleed {
+        let body = CGPath(rect: bounds, transform: nil)
+        fillGradient(ctx, body, rgb(0x4C8DFF), rgb(0x1E4FD6), y0: bounds.minY, y1: bounds.maxY)
+        fillGradient(ctx, body, rgb(0xFFFFFF, 0.16), rgb(0xFFFFFF, 0), y0: bounds.minY, y1: bounds.minY + bounds.height * 0.51)
+        return
+    }
     let body = squircle(CGRect(x: 100, y: 100, width: 824, height: 824))
     ctx.saveGState()
     ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: rgb(0x000000, 0.30))
@@ -182,8 +192,8 @@ func drawBag(_ ctx: CGContext, x0: CGFloat, x1: CGFloat, top: CGFloat, bottom: C
     ctx.restoreGState()
 }
 
-func drawIcon(_ ctx: CGContext, fine: Bool) {
-    drawTile(ctx)
+func drawIcon(_ ctx: CGContext, fine: Bool, fullBleed: CGRect? = nil) {
+    drawTile(ctx, fullBleed: fullBleed)
     let x0: CGFloat = 330, x1: CGFloat = 626, top: CGFloat = 412, bottom: CGFloat = 852
     drawBag(ctx, x0: x0, x1: x1, top: top, bottom: bottom, fine: fine)
     // The green check, where a store bag carries its logo.
@@ -228,6 +238,24 @@ func renderTile(pixels: Int) -> CGImage {
     return ctx.makeImage()!
 }
 
+/// Renders the iOS app icon: opaque (App Store Connect rejects icons with
+/// alpha), square and edge to edge. It shows the design's middle 904 px, a
+/// little more than the tile, so the bag keeps some room once iOS rounds the
+/// corners.
+func renderIOS(pixels: Int) -> CGImage {
+    let region = CGRect(x: 60, y: 60, width: 904, height: 904)
+    let ctx = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
+                        space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                        bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    ctx.interpolationQuality = .high
+    let scale = CGFloat(pixels) / region.width
+    ctx.translateBy(x: 0, y: CGFloat(pixels))
+    ctx.scaleBy(x: scale, y: -scale)
+    ctx.translateBy(x: -region.minX, y: -region.minY)
+    drawIcon(ctx, fine: true, fullBleed: region)
+    return ctx.makeImage()!
+}
+
 func writePNG(_ image: CGImage, to url: URL) throws {
     let rep = NSBitmapImageRep(cgImage: image)
     rep.size = NSSize(width: image.width, height: image.height)
@@ -250,4 +278,6 @@ let json = try JSONSerialization.data(withJSONObject: contents, options: [.prett
 try json.write(to: iconSet.appendingPathComponent("Contents.json"))
 try writePNG(render(pixels: 512), to: repoRoot.appendingPathComponent("docs/logo.png"))
 try writePNG(renderTile(pixels: 64), to: repoRoot.appendingPathComponent("docs/favicon.png"))
-print("Wrote \(sizes.count) icon sizes to \(iconSet.path), docs/logo.png and docs/favicon.png")
+try writePNG(renderIOS(pixels: 1024),
+             to: repoRoot.appendingPathComponent("ios/ReadyForPickup/Assets.xcassets/AppIcon.appiconset/AppIcon.png"))
+print("Wrote \(sizes.count) icon sizes to \(iconSet.path), docs/logo.png, docs/favicon.png and the iOS app icon")

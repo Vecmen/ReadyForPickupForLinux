@@ -37,7 +37,7 @@ Run `update-store-list.py` before every release (stores open and close), and bef
 
 ## App icon and site images
 
-The app icon, the project site's logo (`docs/logo.png`) and its favicon (`docs/favicon.png`) are drawn in code by `Scripts/make-app-icon.swift`: a white paper shopping bag with grey rope handles and a green check, on a blue macOS icon tile. It uses neither Apple's logo nor SF Symbols, which may not appear in app icons. To change the icon, edit the script and run `swift Scripts/make-app-icon.swift`; it rewrites every size in `ReadyForPickup/Assets.xcassets/AppIcon.appiconset`, the site logo and the favicon.
+The app icon, the project site's logo (`docs/logo.png`) and its favicon (`docs/favicon.png`) are drawn in code by `Scripts/make-app-icon.swift`: a white paper shopping bag with grey rope handles and a green check, on a blue macOS icon tile. It uses neither Apple's logo nor SF Symbols, which may not appear in app icons. To change the icon, edit the script and run `swift Scripts/make-app-icon.swift`; it rewrites every size in `ReadyForPickup/Assets.xcassets/AppIcon.appiconset`, the site logo, the favicon and the iOS app's icon (`ios/ReadyForPickup/Assets.xcassets/AppIcon.appiconset/AppIcon.png`).
 
 The site's link-preview image (`docs/social-preview.png`, the picture X and other apps show for a link to the site) is drawn by `Scripts/make-social-preview.swift` from the logo and the app screenshot (`docs/screenshot.png`, also shown on the site and above). Run `swift Scripts/make-social-preview.swift` after changing either.
 
