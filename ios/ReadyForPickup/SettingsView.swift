@@ -14,6 +14,11 @@ struct SettingsView: View {
         }
     }
 
+    private var version: String {
+        let info = Bundle.main.infoDictionary
+        return "\(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))"
+    }
+
     var body: some View {
         Form {
             Section {
@@ -61,7 +66,7 @@ struct SettingsView: View {
                 Text("Enable alerts for each watch in its edit screen. Alerts need a successful inventory check; this app does not include a continuously running server or guaranteed push monitoring.")
             }
             Section("About") {
-                LabeledContent("Version", value: "1.0 (1)")
+                LabeledContent("Version", value: version)
                 LabeledContent("Countries", value: "\(store.catalog?.countries.count ?? 0)")
                 Link("Original macOS project", destination: URL(string: "https://github.com/wehbs/ReadyForPickup")!)
                 Link("Source & GPL-3.0 license", destination: URL(string: "https://github.com/wehbs/ReadyForPickup/blob/main/LICENSE.md")!)

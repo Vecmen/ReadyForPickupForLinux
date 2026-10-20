@@ -100,7 +100,9 @@ final class WatchStore {
         do {
             let results = try await client.check(original, country: country, store: store)
             try Task.checkCancellation()
-            guard watch(id) == original else { return }
+            // Edits that don't change what's fetched (alerts on or off, pausing)
+            // keep this result; the current alert setting decides below.
+            guard let current = watch(id), current.requestsSameInventory(as: original) else { return }
             let previous = snapshots[id]?.fingerprint ?? []
             let snapshot = WatchSnapshot(results: results, checkedAt: Date())
             snapshots[id] = snapshot
@@ -110,14 +112,14 @@ final class WatchStore {
             if !newStock.isEmpty {
                 activity.insert(ActivityEntry(watchID: id, title: "\(original.product.name) available", detail: available.map(\.storeName).joined(separator: ", "), isAvailable: true), at: 0)
                 activity = Array(activity.prefix(100))
-                if original.notificationsEnabled { await NotificationService.shared.notify(watch: original, results: results) }
+                if current.notificationsEnabled { await NotificationService.shared.notify(watch: current, results: results) }
             }
             persist()
         } catch is CancellationError {
             return
         } catch {
             guard !Task.isCancelled else { return }
-            guard watch(id) == original else { return }
+            guard watch(id)?.requestsSameInventory(as: original) == true else { return }
             errors[id] = error.localizedDescription
             if let inventoryError = error as? InventoryError, case .throttled = inventoryError {
                 cooldownUntil = Date().addingTimeInterval(1800)

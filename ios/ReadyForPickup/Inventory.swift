@@ -104,24 +104,19 @@ actor InventoryClient {
             if let message = body["errorMessage"] as? String { throw InventoryError.rejected(message) }
             throw InventoryError.invalidResponse
         }
-        let names = Dictionary(watch.configurations.map { ($0.sku, $0) }, uniquingKeysWith: { first, _ in first })
         var results: [PickupResult] = []
         for entry in stores {
+            // Like the Mac app, skip a store entry that lacks these instead of
+            // failing the whole check.
             guard let storeID = entry["storeNumber"] as? String,
                   let name = entry["storeName"] as? String,
-                  let parts = entry["partsAvailability"] as? [String: [String: Any]] else {
-                throw InventoryError.invalidResponse
-            }
+                  let parts = entry["partsAvailability"] as? [String: [String: Any]] else { continue }
             guard watch.includeNearby || storeID == watch.storeID else { continue }
-            var available: [ProductConfiguration] = []
-            for model in watch.configurations {
-                guard let part = parts[model.sku] ?? parts.values.first(where: { $0["partNumber"] as? String == model.sku }),
-                      part["partNumber"] as? String == model.sku,
-                      let status = part["pickupDisplay"] as? String,
-                      ["available", "unavailable", "ineligible", "default"].contains(status) else {
-                    throw InventoryError.invalidResponse
-                }
-                if status == "available", let configuration = names[model.sku] { available.append(configuration) }
+            // A configuration missing from a store's reply, or with any status
+            // but "available", isn't available there.
+            let available = watch.configurations.filter { model in
+                let part = parts[model.sku] ?? parts.values.first { $0["partNumber"] as? String == model.sku }
+                return part?["partNumber"] as? String == model.sku && part?["pickupDisplay"] as? String == "available"
             }
             results.append(PickupResult(storeID: storeID, storeName: name, city: entry["city"] as? String ?? "", configurations: available))
         }
