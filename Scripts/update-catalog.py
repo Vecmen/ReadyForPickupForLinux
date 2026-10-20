@@ -15,7 +15,8 @@ File format (ProductCatalog.json):
 - locale: the country's key in Stores_LocalBootstrap.json (StoreBootstrap.countryData).
 - storeHost/storePath: the storefront the pickup request goes to:
   https://<storeHost>/<storePath>/shop/retail/pickup-message ("/<storePath>" is
-  left out when storePath is empty), e.g. "" (US), "ca", "uk", "hk/en", "befr".
+  left out when storePath is empty), e.g. "" (US, and China on
+  www.apple.com.cn), "ca", "uk", "jp", "befr".
 - products: ProductType raw values (ProductType.swift) mapped to the SKUs to
   watch, in display order. A country lists only the products it sells; keys
   follow ProductType.allCases order.
@@ -56,19 +57,20 @@ Where the data comes from:
   product is left out if an entry configuration from its page fails, or the
   title check fails, or nothing verifies.
 
-Usage (Python 3.9+, standard library only; a full run sends about 430 paced
-Apple requests and takes two to three hours: the pickup API answered HTTP 541
-for over 15 minutes after about 50 calls in 7 minutes, so pickup calls are
-spaced --pickup-interval seconds apart):
-    Scripts/update-catalog.py --cache-dir /tmp/rfp-cache          # full refresh
-    Scripts/update-catalog.py --only GB,JP --cache-dir /tmp/rfp-cache
-    Scripts/update-catalog.py --dry-run --report-json /tmp/catalog-report.json
-    Scripts/update-catalog.py --us-seed us.json   # first run only: the US entry
-With --cache-dir, an interrupted or throttled run resumes without repeating
-requests; use a fresh directory to see Apple's current data. If Apple keeps
-answering 541 after the client's 60-second and 5-minute waits, the run stops
-without writing; wait half an hour and re-run with the same --cache-dir. Run
-Scripts/update-store-list.py first so verification uses the current stores.
+Usage (Python 3.9+, standard library only). Apple's pickup API answers HTTP
+541 for about half an hour once it has seen roughly 40-60 calls from one
+address (in 2026-10 that happened at 30 and 100 seconds per call alike), and
+each country needs about 10 pickup calls plus 7 page loads. So refresh a few
+countries per run, about an hour apart, always with the same --cache-dir:
+    Scripts/update-catalog.py --only GB,JP,FR,DE --cache-dir ~/rfp-cache
+    Scripts/update-catalog.py --only CH,NL --cache-dir ~/rfp-cache --dry-run \
+        --report-json /tmp/catalog-report.json
+    Scripts/update-catalog.py --us-seed us.json ...  # first run only: the US entry
+The cache makes reruns free (the US check runs once per cache), and a run that
+is still throttled after the client's 60-second and 5-minute waits stops
+without writing anything; rerun it later with the same --cache-dir. Use a new
+cache directory to see Apple's current data. Run Scripts/update-store-list.py
+first so verification uses the current stores.
 """
 
 from __future__ import annotations
@@ -111,6 +113,7 @@ class AppleClient(store_tool.AppleClient):
         super().__init__(**kwargs)
         self.pickup_interval = pickup_interval
 
+
 # ProductType raw values in ProductType.allCases order.
 MAC_TYPES = ["MacBookNeo", "M5MacBookAir13", "M5MacBookAir15", "MacBookPro14", "MacBookPro16",
              "iMac", "MacMini", "MacStudio"]
@@ -141,9 +144,10 @@ MAC_PAGES = {
 SUFFIX_PAGE = "macbook-air"
 UNWATCHED_PAGES = {"carrier-offers", "studio-display", "studio-display-xdr"}
 
-# Store-list locale -> ISO code, English name, host, storefront paths (the first
-# is used; a second, local-language path is the fallback when the first does not
-# share its part numbers). Paths as linked from apple.com/choose-country-region.
+# Store-list locale -> ISO code, English name, host, storefront paths as linked
+# from apple.com/choose-country-region, English first. Buy pages come from the
+# first path that has them (a later path wins if it lists other part numbers);
+# pickup uses the first path whose API answers the app's location.
 COUNTRIES = {
     "de_AT": ("AT", "Austria", "www.apple.com", ["at"]),
     "de_DE": ("DE", "Germany", "www.apple.com", ["de"]),
@@ -176,7 +180,7 @@ COUNTRIES = {
 
 PART_RE = re.compile(r"^([A-Z0-9]{5})([A-Z]{1,3}/A)$")
 CHUNK = 20                  # parts per pickup request, as the app sends
-PICKUP_INTERVAL = 30.0      # default seconds before each pickup request (it answers 541 sooner)
+PICKUP_INTERVAL = 30.0      # default seconds before each pickup request (pages are not throttled)
 LOCATION_ATTEMPTS = 3       # stores to try before giving up on a country
 # pickupDisplay values PartAvailability.PickupAvailability accepts ("default" is
 # mapped to unavailable by FulfillmentModel.parseStoreResponse).
@@ -533,8 +537,7 @@ def build_country(client: AppleClient, locale: str, stores: list, us_entry: dict
     report["macSuffix"] = suffix
 
     # Pickup: the first storefront path (English first) whose API answers the
-    # app's location with stores. Hong Kong's buy pages exist only under /hk/,
-    # but that API wants Chinese place names; /hk/en/ takes the English ones.
+    # app's location with stores.
     ordered = [sku for ptype in IPHONE_TYPES for sku in iphones.get(ptype, [])]
     ordered += [sku for ptype in MAC_TYPES for sku in macs.get(ptype, [])]
     for pickup_path in paths:
