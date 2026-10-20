@@ -6,103 +6,94 @@
 //
 
 import Foundation
+import os
 
-actor SKUDataLoader {
+private let logger = Logger(subsystem: "com.wehbs.ReadyForPickup", category: "Catalog")
 
-    private var cachediPhoneData: [Country: AllPhoneModels] = [:]
+/// The supported countries and the models watched in each, read once from
+/// the bundled ProductCatalog.json. Scripts/update-catalog.py writes that
+/// file: every SKU in it was found in its country's own pickup API, and
+/// Macs are the standard configurations (build-to-order ones have no
+/// pickup part number). Countries and products it doesn't list aren't
+/// offered.
+struct SKUDataLoader: Sendable {
 
-    func skuData(for productType: ProductType, and country: Country) async throws -> SKUData {
-        switch productType {
-        case .MacBookNeo:
-            return MacBookNeoDataForCountry(country)
-        case .M5MacBookAir13:
-            return M5MacBookAir13DataForCountry(country)
-        case .M5MacBookAir15:
-            return M5MacBookAir15DataForCountry(country)
-        case .MacBookPro14:
-            return MacBookPro14DataForCountry(country)
-        case .MacBookPro16:
-            return MacBookPro16DataForCountry(country)
-        case .iMac:
-            return iMacDataForCountry(country)
-        case .MacMini:
-            return MacMiniDataForCountry(country)
-        case .MacStudio:
-            return MacStudioDataForCountry(country)
+    static let shared = SKUDataLoader()
 
-        case .iPhone16:
-            return try phoneModels(for: country).toSkuData(\.iphone16)
-        case .iPhone17:
-            return try phoneModels(for: country).toSkuData(\.iphone17)
-        case .iPhone17e:
-            return try phoneModels(for: country).toSkuData(\.iphone17e)
-        case .iPhoneAir:
-            return try phoneModels(for: country).toSkuData(\.iphoneAir)
-        case .iPhoneDuo:
-            return try phoneModels(for: country).toSkuData(\.iphoneDuo)
-        case .iPhonePro18:
-            return try phoneModels(for: country).toSkuData(\.pro18)
-        case .iPhoneProMax18:
-            return try phoneModels(for: country).toSkuData(\.proMax18)
+    /// The US first, then by English name (the file's order).
+    let countries: [Country]
+    private let skuData: [CountryCode: [ProductType: SKUData]]
+
+    private init() {
+        let loaded: (countries: [Country], skuData: [CountryCode: [ProductType: SKUData]])
+        do {
+            loaded = try Self.load()
+        } catch {
+            logger.error("Couldn't read ProductCatalog.json: \(error.localizedDescription, privacy: .public)")
+            loaded = ([], [:])
         }
+        countries = loaded.countries
+        skuData = loaded.skuData
     }
 
-    // MARK: - Current iPhones (iPhoneModelsCurrent-intl.json, US-verified)
-
-    private func generateiPhoneModelsByCountry() throws -> [Country: AllPhoneModels] {
-        if cachediPhoneData.isEmpty == false {
-            return cachediPhoneData
-        }
-
-        let phoneModelsJson = try loadIPhoneModels()
-        var rv = [Country: AllPhoneModels]()
-
-        let mapping: [(String, WritableKeyPath<AllPhoneModels, [AllPhoneModels.PhoneModel]>)] = [
-            ("iphone16", \AllPhoneModels.iphone16),
-            ("iphone17", \AllPhoneModels.iphone17),
-            ("iphone17e", \AllPhoneModels.iphone17e),
-            ("iphoneAir", \AllPhoneModels.iphoneAir),
-            ("iphoneDuo", \AllPhoneModels.iphoneDuo),
-            ("pro18", \AllPhoneModels.pro18),
-            ("proMax18", \AllPhoneModels.proMax18)
-        ]
-
-        for (countryCode, phones) in phoneModelsJson {
-            guard let country = Countries[countryCode.uppercased()] else {
-                throw AppError.invalidLocalModelStore
-            }
-
-            var phoneModels = AllPhoneModels()
-            for (key, keyPath) in mapping {
-                guard let models = phones[key] else { continue }
-                phoneModels[keyPath: keyPath] = models.map {
-                    AllPhoneModels.PhoneModel(sku: $0.key, productName: $0.value)
-                }
-            }
-            rv[country] = phoneModels
-        }
-
-        cachediPhoneData = rv
-        return rv
+    /// The products sold in `code`'s country, in ProductType.allCases order.
+    func productTypes(in code: CountryCode) -> [ProductType] {
+        ProductType.allCases.filter { skuData[code]?[$0] != nil }
     }
 
-    private func phoneModels(for country: Country) throws -> AllPhoneModels {
-        let iPhoneModels = try generateiPhoneModelsByCountry()
-
-        guard let models = iPhoneModels[country] else {
-            throw AppError.invalidLocalModelStore
-        }
-
-        return models
+    /// Nil when the country doesn't sell the product.
+    func skuData(for productType: ProductType, in code: CountryCode) -> SKUData? {
+        skuData[code]?[productType]
     }
 
-    // country: type: model: description
-    private func loadIPhoneModels() throws -> [String: [String: [String: String]]] {
-        if let path = Bundle.main.path(forResource: "iPhoneModelsCurrent-intl", ofType: "json") {
-            let data = try Data(contentsOf: URL(fileURLWithPath: path))
-            return try JSONDecoder().decode([String: [String: [String: String]]].self, from: data)
-        } else {
+    private static func load() throws -> (countries: [Country], skuData: [CountryCode: [ProductType: SKUData]]) {
+        guard let url = Bundle.main.url(forResource: "ProductCatalog", withExtension: "json") else {
             throw AppError.invalidProjectState
         }
+        let catalog = try JSONDecoder().decode(CatalogFile.self, from: Data(contentsOf: url))
+
+        var countries: [Country] = []
+        var skuData: [CountryCode: [ProductType: SKUData]] = [:]
+        for entry in catalog.countries where skuData[entry.code] == nil {
+            var products: [ProductType: SKUData] = [:]
+            // Product types this build doesn't know are skipped.
+            for (rawValue, models) in entry.products {
+                guard let productType = ProductType(rawValue: rawValue) else { continue }
+                var ordered: [String] = []
+                var names: [String: String] = [:]
+                for model in models where names[model.sku] == nil {
+                    ordered.append(model.sku)
+                    names[model.sku] = model.name
+                }
+                if ordered.isEmpty == false {
+                    products[productType] = SKUData(orderedSKUs: ordered, lookup: names)
+                }
+            }
+            guard products.isEmpty == false else { continue }
+            countries.append(Country(code: entry.code, name: entry.name, locale: entry.locale,
+                                     storeHost: entry.storeHost, storePath: entry.storePath))
+            skuData[entry.code] = products
+        }
+        return (countries, skuData)
     }
+}
+
+/// ProductCatalog.json's shape (see Scripts/update-catalog.py).
+private struct CatalogFile: Decodable {
+    struct Entry: Decodable {
+        let code: CountryCode
+        let name: String
+        let locale: String
+        let storeHost: String
+        let storePath: String
+        /// ProductType raw value -> its models, in display order.
+        let products: [String: [Model]]
+    }
+
+    struct Model: Decodable {
+        let sku: String
+        let name: String
+    }
+
+    let countries: [Entry]
 }

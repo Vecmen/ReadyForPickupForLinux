@@ -28,12 +28,14 @@ struct ReadyForPickupApp: App {
                 CheckForUpdatesView(updater: updater)
             }
             CommandGroup(replacing: .newItem) {
-                Button(action: {
-                    Task { await model.fetchLatestInventory() }
-                }, label: {
-                    Text("Reload Inventory")
-                })
-                    .keyboardShortcut("r", modifiers: .command)
+                Button("Refresh Selected Search") {
+                    Task { await model.fetchSelected() }
+                }
+                .keyboardShortcut("r", modifiers: .command)
+                Button("Refresh All Searches") {
+                    Task { await model.fetchAllSearches() }
+                }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
             }
         }
         

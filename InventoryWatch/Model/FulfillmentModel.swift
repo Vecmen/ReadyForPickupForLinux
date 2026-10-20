@@ -9,76 +9,51 @@ import Foundation
 
 actor FulfillmentModel {
 
-    let defaultsVendor = DefaultsVendor()
-    let skuDataLoader = SKUDataLoader()
-
-    func skuData(for search: SavedSearch) async throws -> SKUData {
-        try await skuDataLoader.skuData(for: search.productType, and: defaultsVendor.preferredCountry)
-    }
-
-    func skuData(for productType: ProductType) async throws -> SKUData {
-        try await skuDataLoader.skuData(for: productType, and: defaultsVendor.preferredCountry)
-    }
-
     private var cachedStoreData: [String: StoreCountry] = [:]
 
+    /// Stores by locale, from the bundled Stores_LocalBootstrap.json.
+    /// Apple's remote store list (rsp-web/store-list) is gone (HTTP 404),
+    /// so the maintainer refreshes the bundled copy instead
+    /// (Scripts/update-store-list.py).
     func loadStoresByCountry() async throws -> [String: StoreCountry] {
         if cachedStoreData.isEmpty == false {
             return cachedStoreData
         }
-
-        let decoder = JSONDecoder()
-
-        do {
-            // Remote store list currently returns HTTP 404 (live
-            // 2026-10-18); this throws and falls back to local data.
-            let url = URL(string: "https://www.apple.com/rsp-web/store-list?locale=en_US")!
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let jsonStores = try decoder.decode(StoreBootstrap.self, from: data)
-
-            cachedStoreData = jsonStores.countryData
-            return jsonStores.countryData
-        } catch {
-            print(error)
-        }
-
-        // If remote stores failed to load, fallback to local bootstrap.
-        // Cache it too, or every fetch re-requests the failing remote list.
-        if let path = Bundle.main.path(forResource: "Stores_LocalBootstrap", ofType: "json") {
-            do {
-                let data = try Data(contentsOf: URL(fileURLWithPath: path))
-                let jsonStores = try decoder.decode(StoreBootstrap.self, from: data)
-                cachedStoreData = jsonStores.countryData
-                return jsonStores.countryData
-            } catch {
-                print(error)
-                throw error
-            }
-        } else {
+        guard let url = Bundle.main.url(forResource: "Stores_LocalBootstrap", withExtension: "json") else {
             throw AppError.invalidProjectState
         }
+        let data = try Data(contentsOf: url)
+        cachedStoreData = try JSONDecoder().decode(StoreBootstrap.self, from: data).countryData
+        return cachedStoreData
     }
 
-    func storesForPreferredCountry() async throws -> [RetailStore] {
-        let byCountry = try await loadStoresByCountry()
-        guard let stores = byCountry[defaultsVendor.preferredCountry.locale]?.stores else {
+    /// The bundled stores in `country`, in file order.
+    func stores(in country: Country) async throws -> [RetailStore] {
+        let byLocale = try await loadStoresByCountry()
+        guard let stores = byLocale[country.locale]?.stores else {
             throw AppError.invalidProjectState
         }
         return stores
     }
 
-    /// Fetches inventory for one saved search against Apple's current
+    /// Fetches inventory for one saved search against its country's
     /// pickup endpoint. Requests are chunked at 20 parts (Apple's cap)
     /// and merged by store.
     func fetchInventory(for search: SavedSearch) async throws -> [(FulfillmentStore, [PartAvailability])] {
-        let skuData = try await skuData(for: search)
+        guard let country = Country.with(code: search.countryCode) else {
+            // No countries at all: ProductCatalog.json couldn't be read.
+            throw Country.all.isEmpty ? AppError.invalidLocalModelStore : AppError.countryNotSupported
+        }
+        guard let skuData = SKUDataLoader.shared.skuData(for: search.productType, in: country.code) else {
+            throw AppError.productNotSold
+        }
 
         var allSkus = skuData.orderedSKUs
         if let custom = search.customSkuData, allSkus.contains(custom.sku) == false {
             allSkus.append(custom.sku)
         }
 
-        let location = try await pickupLocation(storeNumber: search.storeNumber)
+        let location = try await pickupLocation(for: search, in: country)
         let filter: Set<String>? = search.onlyPreferred
             ? Set(search.preferredSKUs).union(search.customSkuData.map { [$0.sku] } ?? [])
             : nil
@@ -87,7 +62,7 @@ actor FulfillmentModel {
         var order: [String] = []
         for chunkStart in stride(from: 0, to: allSkus.count, by: 20) {
             let chunk = Array(allSkus[chunkStart..<min(chunkStart + 20, allSkus.count)])
-            let stores = try await fetchChunk(skus: chunk, location: location, skuData: skuData, search: search)
+            let stores = try await fetchChunk(skus: chunk, location: location, country: country, skuData: skuData, search: search)
             for store in stores {
                 if let existing = merged[store.storeNumber] {
                     let parts = existing.partsAvailability + store.partsAvailability.filter { new in
@@ -105,11 +80,11 @@ actor FulfillmentModel {
         return parseAvailableModels(from: collected, filterForModels: filter, search: search)
     }
 
-    private func fetchChunk(skus: [String], location: String, skuData: SKUData, search: SavedSearch) async throws -> [FulfillmentStore] {
+    private func fetchChunk(skus: [String], location: String, country: Country, skuData: SKUData, search: SavedSearch) async throws -> [FulfillmentStore] {
         var components = URLComponents()
         components.scheme = "https"
-        components.host = "www.apple.com"
-        components.path = "/\(defaultsVendor.countryPathElement.lowercased())shop/retail/pickup-message"
+        components.host = country.storeHost
+        components.path = country.storefrontPath("shop/retail/pickup-message")
         var items: [URLQueryItem] = [URLQueryItem(name: "pl", value: "true"), URLQueryItem(name: "location", value: location)]
         for (i, sku) in skus.enumerated() where sku.isEmpty == false {
             items.append(URLQueryItem(name: "parts.\(i)", value: sku))
@@ -118,23 +93,39 @@ actor FulfillmentModel {
 
         guard let url = components.url else { throw AppError.couldNotGenerateURL }
         var request = URLRequest(url: url)
-        request.addValue("https://www.apple.com/shop/buy-iphone/", forHTTPHeaderField: "Referer")
-        print(url.absoluteString)
+        // The storefront's own buy page, as Scripts/update-catalog.py sends
+        // when it checks the catalog.
+        request.addValue("https://\(country.storeHost)\(country.storefrontPath("shop/buy-iphone/"))", forHTTPHeaderField: "Referer")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         return try parseStoreResponse(data, response: response as? HTTPURLResponse, skuData: skuData, search: search)
     }
 
     /// pickup-message takes a city / postal-code `location`, not an
-    /// R### store number. Resolve it from the store list.
-    private func pickupLocation(storeNumber: String) async throws -> String {
-        if let stores = try? await storesForPreferredCountry(),
-           let store = stores.first(where: { $0.storeNumber == storeNumber }) {
-            if let postal = store.address.postalCode, postal.isEmpty == false { return postal }
-            return store.address.cityStateDisplay
+    /// R### store number. Resolve it from the country's store list; a
+    /// store that isn't listed (e.g. closed) has no location to send,
+    /// except one in closedStoreLocations for a search that includes
+    /// nearby stores (they are all it can find).
+    private func pickupLocation(for search: SavedSearch, in country: Country) async throws -> String {
+        guard let store = try await stores(in: country).first(where: { $0.storeNumber == search.storeNumber }) else {
+            if search.includeNearby, let location = Self.closedStoreLocations[country.locale]?[search.storeNumber] {
+                return location
+            }
+            throw AppError.storeNotListed
         }
-        return storeNumber
+        if let postal = store.address.postalCode, postal.isEmpty == false { return postal }
+        return store.address.cityStateDisplay
     }
+
+    /// Stores the 2026-10 store-list refresh dropped (closed) in countries
+    /// searches could be saved in before it, by locale, with the postal
+    /// code those searches sent.
+    private static let closedStoreLocations: [String: [String: String]] = [
+        "en_AU": ["R458": "2077"],
+        "en_GB": ["R252": "BS1 3BZ"],
+        "en_US": ["R052": "95014", "R063": "21204", "R141": "60062", "R198": "96815",
+                  "R218": "48038", "R285": "92025", "R463": "28216", "R629": "06611"],
+    ]
 
     private func parseStoreResponse(_ responseData: Data?, response: HTTPURLResponse?, skuData: SKUData, search: SavedSearch) throws -> [FulfillmentStore] {
         guard let responseData = responseData else {
@@ -193,9 +184,10 @@ actor FulfillmentModel {
     }
 
     private func parseAvailableModels(from stores: [FulfillmentStore], filterForModels: Set<String>?, search: SavedSearch) -> [(FulfillmentStore, [PartAvailability])] {
-        let scoped = search.includeNearby ? stores : stores.filter { $0.storeNumber == search.storeNumber }
+        // The search's own store first, the rest in the order Apple sent.
+        let own = stores.filter { $0.storeNumber == search.storeNumber }
+        let scoped = search.includeNearby ? own + stores.filter { $0.storeNumber != search.storeNumber } : own
         return scoped
-            .sorted(by: { first, _ in first.storeNumber == search.storeNumber })
             .compactMap { store in
                 let rv = store.partsAvailability.filter { part in
                     guard part.availability == .available else { return false }

@@ -13,7 +13,6 @@ struct SettingsView: View {
     @EnvironmentObject var model: ViewModel
     @EnvironmentObject var updater: UpdaterViewModel
     @AppStorage("preferredCountry") private var preferredCountry = "US"
-    @AppStorage("useLargeText") private var useLargeText: Bool = false
     @AppStorage("preferredUpdateInterval") private var preferredUpdateInterval: Int = 5
     @State private var pushoverUserKey: String = PushoverSettings.userKey
     @State private var pushoverApiToken: String = PushoverSettings.apiToken
@@ -21,14 +20,17 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Text("Searches, products, stores and notifications are configured per search in the main window's right-hand inspector.")
+            Text("Searches, countries, products, stores and notifications are configured per search in the main window's right-hand inspector.")
                 .foregroundColor(.secondary)
 
-            Picker("Country (store list)", selection: $preferredCountry) {
-                ForEach(OrderedCountries, id: \.self) { code in
-                    Text(Countries[code]?.name ?? code).tag(code)
+            // Stored under the old app-wide setting's key (see DefaultsVendor).
+            Picker("Default country", selection: $preferredCountry) {
+                ForEach(Country.all) { country in
+                    Text(country.name).tag(country.code)
                 }
             }
+            Text("New searches start in this country, at a store there. Each search's own country is set in the inspector.")
+                .font(.caption).foregroundColor(.secondary)
 
             Picker("Auto-refresh every", selection: $preferredUpdateInterval) {
                 Text("Off").tag(0)
@@ -43,10 +45,8 @@ struct SettingsView: View {
                 // Apple is throttling requests.
                 model.restartAutoRefresh(withMinutes: newValue)
             }
-            Text("Searches refresh automatically while the app is running, one after another. Use the toolbar refresh button (or Cmd-R) to re-check now - that also resets the schedule.")
+            Text("Searches refresh automatically, one after another, while the app is running - even with its window closed. To re-check now, use the toolbar refresh button or File > Refresh Selected Search (Cmd-R), or File > Refresh All Searches (Shift-Cmd-R); either also resets the schedule.")
                 .font(.caption).foregroundColor(.secondary)
-
-            Toggle("Use larger text sizes", isOn: $useLargeText)
 
             Divider()
 
@@ -54,8 +54,33 @@ struct SettingsView: View {
                 Text("Software Updates").font(.headline)
                 Toggle("Automatically check for updates", isOn: $updater.automaticallyChecksForUpdates)
                 CheckForUpdatesView(updater: updater)
-                Text("Updates are downloaded from GitHub via Sparkle. Version 0.3.1 and earlier must be updated manually one last time to 0.3.2.")
+                Text("Updates are downloaded from GitHub via Sparkle. Version 0.3.2 and earlier can't install updates: download 0.3.3 or later once from the Releases page.")
                     .font(.caption).foregroundColor(.secondary)
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Mac notifications").font(.headline)
+                // On only when macOS allows them too; turning it on asks
+                // macOS, or opens System Settings if the user said no there.
+                Toggle("Enable Mac notifications", isOn: Binding(
+                    get: { model.macNotificationsActive },
+                    set: { on in Task { await model.setMacNotificationsEnabled(on) } }))
+                Text(macNotificationsCaption)
+                    .font(.caption).foregroundColor(.secondary)
+                HStack {
+                    if model.macNotificationsEnabled, model.macNotificationStatus == .denied {
+                        Button("Open Notification Settings…") { NotificationManager.openSystemSettings() }
+                    }
+                    Button("Send test notification") {
+                        Task { await model.sendTestMacNotification() }
+                    }
+                    .disabled(model.macNotificationsActive == false)
+                }
+                if let feedback = model.macNotificationFeedback {
+                    Text(feedback).font(.caption)
+                }
             }
 
             Divider()
@@ -94,5 +119,25 @@ struct SettingsView: View {
         }
         .padding(20)
         .frame(width: 420)
+        .task { await model.refreshMacNotificationStatus() }
+        // Picks up a change made in System Settings.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await model.refreshMacNotificationStatus() }
+        }
+    }
+
+    private var macNotificationsCaption: String {
+        if model.macNotificationsActive {
+            return "On. Banners, sounds and Focus follow System Settings > Notifications > ReadyForPickup. Each search can also turn them off in the inspector."
+        }
+        if model.macNotificationsEnabled == false {
+            return "Off: ReadyForPickup sends no Mac notifications."
+        }
+        switch model.macNotificationStatus {
+        case .denied:
+            return "macOS has notifications turned off for ReadyForPickup, and only System Settings can turn them back on: turn on Allow notifications there, then come back."
+        default:
+            return "Turn this on and macOS will ask whether ReadyForPickup may send notifications."
+        }
     }
 }

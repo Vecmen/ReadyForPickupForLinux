@@ -5,13 +5,16 @@
 
 import Foundation
 
-/// One saved search in the 2.0-style UI: a product at a store, with its
-/// own preferred models, nearby-store preference, custom SKU and
-/// local-notification preference. Multiple searches are persisted as
-/// Codable JSON in UserDefaults (key "savedSearches").
+/// One saved search in the 2.0-style UI: a product at a store in one
+/// country, with its own preferred models, nearby-store preference,
+/// custom SKU and local-notification preference. Multiple searches are
+/// persisted as Codable JSON in UserDefaults (key "savedSearches").
 struct SavedSearch: Codable, Identifiable, Equatable {
     var id: UUID
     var productTypeRaw: String
+    /// The store's country (Country.code). It decides the store list, the
+    /// storefront requests go to and the part numbers watched.
+    var countryCode: CountryCode
     var storeNumber: String
     var storeName: String?
     var includeNearby: Bool
@@ -24,6 +27,7 @@ struct SavedSearch: Codable, Identifiable, Equatable {
 
     init(id: UUID = UUID(),
          productType: ProductType,
+         countryCode: CountryCode = "US",
          storeNumber: String,
          storeName: String? = nil,
          includeNearby: Bool = true,
@@ -35,6 +39,7 @@ struct SavedSearch: Codable, Identifiable, Equatable {
          customSkuNickname: String = "") {
         self.id = id
         self.productTypeRaw = productType.rawValue
+        self.countryCode = countryCode
         self.storeNumber = storeNumber
         self.storeName = storeName
         self.includeNearby = includeNearby
@@ -47,7 +52,7 @@ struct SavedSearch: Codable, Identifiable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, productTypeRaw, storeNumber, storeName, includeNearby
+        case id, productTypeRaw, countryCode, storeNumber, storeName, includeNearby
         case preferredSKUs, onlyPreferred, notifyOnThisMac, notifyViaPushover
         case customSku, customSkuNickname
     }
@@ -56,6 +61,11 @@ struct SavedSearch: Codable, Identifiable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
         productTypeRaw = try c.decode(String.self, forKey: .productTypeRaw)
+        // Added with per-search countries. Before then every search used
+        // the app-wide country setting (its store list, storefront and
+        // part numbers), so a search saved then gets that country, even
+        // one the catalog doesn't have. SearchStore.load saves it.
+        countryCode = try c.decodeIfPresent(String.self, forKey: .countryCode) ?? DefaultsVendor().storedCountryCode
         storeNumber = try c.decode(String.self, forKey: .storeNumber)
         storeName = try c.decodeIfPresent(String.self, forKey: .storeName)
         includeNearby = try c.decodeIfPresent(Bool.self, forKey: .includeNearby) ?? true
@@ -85,10 +95,19 @@ struct SavedSearch: Codable, Identifiable, Equatable {
     func isPreferred(_ part: PartAvailability) -> Bool {
         preferredSKUs.contains(part.partNumber) || customSkuData?.sku == part.partNumber
     }
+
+    /// Whether a fetch made for `other` (an earlier copy) is still current
+    /// for this search. A new country, product, store or results filter
+    /// makes it stale (each of those edits starts its own fetch); other
+    /// edits don't.
+    func requestsSameInventory(as other: SavedSearch) -> Bool {
+        countryCode == other.countryCode && productTypeRaw == other.productTypeRaw
+            && storeNumber == other.storeNumber
+            && includeNearby == other.includeNearby && onlyPreferred == other.onlyPreferred
+    }
 }
 
-/// UserDefaults-backed store for saved searches, with one-time
-/// migration of the legacy single-search preferences.
+/// UserDefaults-backed store for saved searches.
 enum SearchStore {
     private static let key = "savedSearches"
 
@@ -96,44 +115,26 @@ enum SearchStore {
         if let data = UserDefaults.standard.data(forKey: key),
            let decoded = try? JSONDecoder().decode([SavedSearch].self, from: data),
            decoded.isEmpty == false {
+            // Saved now, so a search from before searches had countries
+            // keeps the one it decoded with (see init(from:)) when the
+            // default country, stored under the same key, changes.
+            save(decoded)
             return decoded
         }
-        let migrated = migrateLegacyPreferences()
-        save(migrated)
-        return migrated
+        let initial = [defaultSearch()]
+        save(initial)
+        return initial
     }
 
     static func save(_ searches: [SavedSearch]) {
         if let data = try? JSONEncoder().encode(searches) {
             UserDefaults.standard.set(data, forKey: key)
         }
-        // Mirror the first search into the legacy keys so the older
-        // DefaultsVendor-based code paths keep seeing a sane value.
-        if let first = searches.first {
-            UserDefaults.standard.set(first.productTypeRaw, forKey: "preferredProductType")
-            UserDefaults.standard.set(first.storeNumber, forKey: "preferredStoreNumber")
-            UserDefaults.standard.set(first.preferredSKUs.joined(separator: ","), forKey: "preferredSKUs")
-            UserDefaults.standard.set(first.includeNearby, forKey: "shouldIncludeNearbyStores")
-            UserDefaults.standard.set(first.onlyPreferred, forKey: "showResultsOnlyForPreferredModels")
-        }
     }
 
-    /// Builds the first saved search from the pre-2.0 single-search
-    /// UserDefaults keys, so an existing setup is not lost.
-    static func migrateLegacyPreferences() -> [SavedSearch] {
-        let defaults = DefaultsVendor()
-        var search = SavedSearch(
-            productType: defaults.preferredProductType,
-            storeNumber: defaults.preferredStoreNumber,
-            includeNearby: defaults.shouldIncludeNearbyStores,
-            preferredSKUs: Array(defaults.preferredSKUs).sorted(),
-            onlyPreferred: defaults.showResultsOnlyForPreferredModels,
-            notifyOnThisMac: true
-        )
-        if let custom = defaults.customSkuData {
-            search.customSku = custom.sku
-            search.customSkuNickname = custom.nickname
-        }
-        return [search]
+    /// The first search of a fresh install, and the US store a new search
+    /// starts at when no other search is in the US.
+    static func defaultSearch() -> SavedSearch {
+        SavedSearch(productType: .iPhonePro18, countryCode: "US", storeNumber: "R032", storeName: "SoHo")
     }
 }

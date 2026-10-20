@@ -22,14 +22,14 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                Button { model.addSearch() } label: { Image(systemName: "plus") }
+                Button { Task { await model.addSearch() } } label: { Image(systemName: "plus") }
                     .help("Add a search")
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 if model.isLoading { ProgressView().controlSize(.small) }
+                // No shortcut here: Cmd-R is File > Refresh Selected Search.
                 Button { Task { await model.fetchSelected() } } label: { Image(systemName: "arrow.clockwise") }
-                    .help("Refresh selected search")
-                    .keyboardShortcut("r", modifiers: .command)
+                    .help("Refresh selected search (Cmd-R)")
                 Button(role: .destructive) { searchPendingDeletion = model.selectedSearch } label: { Image(systemName: "trash") }
                     .help("Delete selected search")
                     .disabled(model.selectedSearch == nil)
@@ -49,22 +49,21 @@ struct ContentView: View {
         }
         .task {
             await model.loadStores()
-            if let selected = model.selectedSearch {
-                _ = await model.skuData(for: selected.productType)
-            }
-            await model.fetchAllSearches()
-            model.restartAutoRefresh()
-            NotificationManager.shared.requestNotificationPermissions()
+            await model.prepareMacNotifications()
+            // Only the first window starts monitoring; it keeps running
+            // after the window closes, so a reopened one doesn't restart it.
+            await model.startMonitoring()
         }
-        .onDisappear {
-            model.stopAutoRefresh()
+        // Picks up a notification change made in System Settings.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await model.refreshMacNotificationStatus() }
         }
         .onChange(of: model.selectedSearchID) { _ in
             Task {
                 await model.loadStores()
-                if let selected = model.selectedSearch {
-                    _ = await model.skuData(for: selected.productType)
-                    if model.results[selected.id] == nil { await model.fetchSelected() }
+                if let selected = model.selectedSearch,
+                   model.results[selected.id] == nil, model.isFetching(selected) == false {
+                    await model.fetchSelected()
                 }
             }
         }
@@ -81,7 +80,7 @@ struct ContentView: View {
                             .foregroundColor(.secondary)
                             .frame(width: 18)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("\(search.productType.presentableName) at \(model.storeName(for: search))")
+                            Text(search.productType.presentableName)
                                 .lineLimit(1)
                             Text("at \(model.storeName(for: search))")
                                 .font(.caption)
@@ -188,9 +187,9 @@ struct ContentView: View {
                         VStack(spacing: 8) {
                             Spacer()
                             Image(systemName: "magnifyingglass").font(.largeTitle).foregroundColor(.secondary)
-                            Text(model.isLoading ? "Checking inventory…" : "No models available in-store.")
+                            Text(model.isFetching(search) ? "Checking inventory…" : "No models available in-store.")
                                 .foregroundColor(.secondary)
-                            if model.searchErrors[search.id] == nil && model.isLoading == false {
+                            if model.searchErrors[search.id] == nil && model.isFetching(search) == false {
                                 Text("Available models for this search will appear here, grouped by store.")
                                     .font(.caption).foregroundColor(.secondary)
                             }
@@ -237,11 +236,16 @@ struct ContentView: View {
 
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Product Type").font(.headline)
+                            // Only what the search's country sells.
+                            let products = model.productTypes(for: search)
                             Picker("", selection: productBinding) {
                                 ForEach(ProductCategory.allCases) { category in
-                                    Section(category.rawValue) {
-                                        ForEach(category.products) { product in
-                                            Text(product.presentableName).tag(product.rawValue)
+                                    let sold = category.products.filter { products.contains($0) }
+                                    if sold.isEmpty == false {
+                                        Section(category.rawValue) {
+                                            ForEach(sold) { product in
+                                                Text(product.presentableName).tag(product.rawValue)
+                                            }
                                         }
                                     }
                                 }
@@ -254,17 +258,24 @@ struct ContentView: View {
 
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Custom SKU").font(.headline)
-                            TextField("Part number (e.g. MHQJ4LL/A)", text: customSkuBinding)
+                            TextField("Part number (e.g. \(model.skuData(for: search)?.orderedSKUs.first ?? "MHQJ4LL/A"))", text: customSkuBinding)
                                 .textFieldStyle(.roundedBorder)
                             TextField("Nickname", text: customNameBinding)
                                 .textFieldStyle(.roundedBorder)
-                            Text("A custom model is watched alongside the models above and counts as a preferred model for notifications.")
+                            Text("A custom model is watched alongside the models above and counts as a preferred model for notifications. Use a part number from this search's country.")
                                 .font(.caption).foregroundColor(.secondary)
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Notifications").font(.headline)
                             Toggle("Send inventory notifications on this Mac", isOn: notifyBinding)
+                            // Not while macOS's first prompt is still unanswered.
+                            if search.notifyOnThisMac, model.macNotificationsEnabled == false || model.macNotificationStatus == .denied {
+                                Text(model.macNotificationsEnabled
+                                     ? "macOS has notifications turned off for ReadyForPickup, so none will appear. Turn them on in Settings (Cmd-,)."
+                                     : "Mac notifications are off in Settings (Cmd-,), so none will appear.")
+                                    .font(.caption).foregroundColor(.orange)
+                            }
                             Toggle("Send Pushover notifications", isOn: pushoverBinding)
                             Text(model.pushoverConfigured
                                  ? "Notifications are sent when a preferred model is newly found. Pushover is configured in Settings."
@@ -282,7 +293,7 @@ struct ContentView: View {
 
     private func banner(for search: SavedSearch) -> some View {
         // Only claim channels that are actually active for this search.
-        let macOn = search.notifyOnThisMac
+        let macOn = search.notifyOnThisMac && model.macNotificationsActive
         let pushoverOn = search.notifyViaPushover && model.pushoverConfigured
         let channels: String = [macOn ? "on this Mac" : nil, pushoverOn ? "via Pushover" : nil]
             .compactMap { $0 }.joined(separator: " and ")
@@ -301,7 +312,7 @@ struct ContentView: View {
             Spacer()
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.green.opacity((search.notifyOnThisMac || (search.notifyViaPushover && model.pushoverConfigured)) ? 0.10 : 0.04)))
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.green.opacity(channels.isEmpty == false ? 0.10 : 0.04)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15)))
     }
 
@@ -311,7 +322,7 @@ struct ContentView: View {
             Text("Notifications are only sent when preferred models are found.")
                 .font(.caption).foregroundColor(.secondary)
 
-            if let skuData = model.skuDataByProduct[search.productType] {
+            if let skuData = model.skuData(for: search) {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(skuData.orderedSKUs, id: \.self) { sku in
                         Toggle(isOn: preferredBinding(search: search, sku: sku)) {
@@ -323,7 +334,8 @@ struct ContentView: View {
                 .padding(8)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
             } else {
-                ProgressView().controlSize(.small)
+                Text("There are no models to watch for this product in this search's country.")
+                    .font(.caption).foregroundColor(.secondary)
             }
 
             Toggle("Only include results for preferred models", isOn: onlyPreferredBinding)
@@ -332,16 +344,36 @@ struct ContentView: View {
     }
 
     private func storeSection(for search: SavedSearch) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Preferred Store").font(.headline)
-            Picker("", selection: storeBinding) {
-                ForEach(model.stores, id: \.storeNumber) { store in
-                    Text("\(store.name) — \(store.address.cityStateDisplay)").tag(store.storeNumber)
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Country").font(.headline)
+                Picker("", selection: countryBinding) {
+                    ForEach(Country.all) { country in
+                        Text(country.name).tag(country.code)
+                    }
+                    if Country.with(code: search.countryCode) == nil {
+                        Text("\(search.countryCode) (not supported)").tag(search.countryCode)
+                    }
                 }
+                .labelsHidden()
+                Text("Changing the country picks a store there. Most part numbers differ by country: preferred models and the custom SKU are kept only if that country's model list has them too.")
+                    .font(.caption).foregroundColor(.secondary)
             }
-            .labelsHidden()
-            Toggle("Include results from nearby stores", isOn: nearbyBinding)
-                .toggleStyle(.checkbox)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Preferred Store").font(.headline)
+                let stores = model.stores(for: search)
+                let current = stores.first(where: { $0.storeNumber == search.storeNumber })
+                // Not listed: stores still loading, or one that has closed
+                // since the search was saved.
+                StoreChooser(stores: stores,
+                             selectedStoreNumber: search.storeNumber,
+                             selectedLabel: current.map { "\($0.name) — \($0.address.cityStateDisplay)" }
+                                ?? (stores.isEmpty ? model.storeName(for: search) : "\(model.storeName(for: search)) (not listed)"),
+                             choose: { storeBinding.wrappedValue = $0 })
+                Toggle("Include results from nearby stores", isOn: nearbyBinding)
+                    .toggleStyle(.checkbox)
+            }
         }
     }
 
@@ -354,10 +386,15 @@ struct ContentView: View {
                         search.productTypeRaw = newValue
                         search.preferredSKUs = []
                     }
-                    Task {
-                        if let selected = model.selectedSearch { _ = await model.skuData(for: selected.productType) }
-                        await model.fetchSelected()
-                    }
+                    Task { await model.fetchSelected() }
+                })
+    }
+
+    private var countryBinding: Binding<String> {
+        Binding(get: { model.selectedSearch?.countryCode ?? "US" },
+                set: { code in
+                    // Also picks a store there and refreshes.
+                    if let id = model.selectedSearch?.id { model.changeCountry(ofSearch: id, to: code) }
                 })
     }
 
@@ -404,5 +441,94 @@ struct ContentView: View {
     private var customNameBinding: Binding<String> {
         Binding(get: { model.selectedSearch?.customSkuNickname ?? "" },
                 set: { value in model.updateSelected { $0.customSkuNickname = value } })
+    }
+}
+
+/// The store picker: a button showing the search's store that opens a
+/// searchable list of the country's stores (hundreds in the US).
+private struct StoreChooser: View {
+    let stores: [RetailStore]
+    let selectedStoreNumber: String
+    let selectedLabel: String
+    let choose: (String) -> Void
+
+    @State private var isPresented = false
+    @State private var query = ""
+    @FocusState private var searchFieldFocused: Bool
+
+    var body: some View {
+        Button { isPresented = true } label: {
+            HStack {
+                Text(selectedLabel).lineLimit(1)
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.up.chevron.down").foregroundColor(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .disabled(stores.isEmpty)
+        .popover(isPresented: $isPresented, arrowEdge: .leading) { popover }
+    }
+
+    /// Every word of the query must appear in the store's name, city, state
+    /// or postal code, ignoring case and accents ("zurich" finds Zürich).
+    private var matches: [RetailStore] {
+        let words = query.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard words.isEmpty == false else { return stores }
+        return stores.filter { store in
+            let fields = [store.name, store.address.city, store.address.stateName ?? "",
+                          store.address.stateCode ?? "", store.address.postalCode ?? ""]
+            return words.allSatisfy { word in fields.contains { $0.localizedStandardContains(word) } }
+        }
+    }
+
+    private var popover: some View {
+        VStack(spacing: 0) {
+            TextField("Search by store, city, state or postal code", text: $query)
+                .textFieldStyle(.roundedBorder)
+                .focused($searchFieldFocused)
+                // Return picks the first match.
+                .onSubmit { if let first = matches.first { pick(first) } }
+                .padding(10)
+            Divider()
+            let found = matches
+            if found.isEmpty {
+                Text("No stores match “\(query)”.")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollViewReader { proxy in
+                    List(found, id: \.storeNumber) { store in
+                        Button { pick(store) } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(store.name)
+                                    Text(store.address.cityStateDisplay)
+                                        .font(.caption).foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if store.storeNumber == selectedStoreNumber {
+                                    Image(systemName: "checkmark").foregroundColor(.accentColor)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .listStyle(.plain)
+                    .onAppear { proxy.scrollTo(selectedStoreNumber, anchor: .center) }
+                }
+            }
+        }
+        .frame(width: 340, height: 420)
+        .onAppear {
+            query = ""
+            // Focus once the popover is on screen.
+            DispatchQueue.main.async { searchFieldFocused = true }
+        }
+    }
+
+    private func pick(_ store: RetailStore) {
+        isPresented = false
+        if store.storeNumber != selectedStoreNumber { choose(store.storeNumber) }
     }
 }
