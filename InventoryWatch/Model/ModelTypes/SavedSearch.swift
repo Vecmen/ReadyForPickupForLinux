@@ -5,13 +5,16 @@
 
 import Foundation
 
-/// One saved search in the 2.0-style UI: a product at a store, with its
-/// own preferred models, nearby-store preference, custom SKU and
-/// local-notification preference. Multiple searches are persisted as
-/// Codable JSON in UserDefaults (key "savedSearches").
+/// One saved search in the 2.0-style UI: a product at a store in one
+/// country, with its own preferred models, nearby-store preference,
+/// custom SKU and local-notification preference. Multiple searches are
+/// persisted as Codable JSON in UserDefaults (key "savedSearches").
 struct SavedSearch: Codable, Identifiable, Equatable {
     var id: UUID
     var productTypeRaw: String
+    /// The store's country (Country.code). It decides the store list, the
+    /// storefront requests go to and the part numbers watched.
+    var countryCode: CountryCode
     var storeNumber: String
     var storeName: String?
     var includeNearby: Bool
@@ -24,6 +27,7 @@ struct SavedSearch: Codable, Identifiable, Equatable {
 
     init(id: UUID = UUID(),
          productType: ProductType,
+         countryCode: CountryCode = "US",
          storeNumber: String,
          storeName: String? = nil,
          includeNearby: Bool = true,
@@ -35,6 +39,7 @@ struct SavedSearch: Codable, Identifiable, Equatable {
          customSkuNickname: String = "") {
         self.id = id
         self.productTypeRaw = productType.rawValue
+        self.countryCode = countryCode
         self.storeNumber = storeNumber
         self.storeName = storeName
         self.includeNearby = includeNearby
@@ -47,7 +52,7 @@ struct SavedSearch: Codable, Identifiable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, productTypeRaw, storeNumber, storeName, includeNearby
+        case id, productTypeRaw, countryCode, storeNumber, storeName, includeNearby
         case preferredSKUs, onlyPreferred, notifyOnThisMac, notifyViaPushover
         case customSku, customSkuNickname
     }
@@ -56,6 +61,9 @@ struct SavedSearch: Codable, Identifiable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
         productTypeRaw = try c.decode(String.self, forKey: .productTypeRaw)
+        // Added with per-search countries. Searches saved before then are
+        // US searches, the only country the app had complete data for.
+        countryCode = try c.decodeIfPresent(String.self, forKey: .countryCode) ?? "US"
         storeNumber = try c.decode(String.self, forKey: .storeNumber)
         storeName = try c.decodeIfPresent(String.self, forKey: .storeName)
         includeNearby = try c.decodeIfPresent(Bool.self, forKey: .includeNearby) ?? true
@@ -87,10 +95,12 @@ struct SavedSearch: Codable, Identifiable, Equatable {
     }
 
     /// Whether a fetch made for `other` (an earlier copy) is still current
-    /// for this search. A new product, store or results filter makes it
-    /// stale (each of those edits starts its own fetch); other edits don't.
+    /// for this search. A new country, product, store or results filter
+    /// makes it stale (each of those edits starts its own fetch); other
+    /// edits don't.
     func requestsSameInventory(as other: SavedSearch) -> Bool {
-        productTypeRaw == other.productTypeRaw && storeNumber == other.storeNumber
+        countryCode == other.countryCode && productTypeRaw == other.productTypeRaw
+            && storeNumber == other.storeNumber
             && includeNearby == other.includeNearby && onlyPreferred == other.onlyPreferred
     }
 }
@@ -116,9 +126,9 @@ enum SearchStore {
         }
     }
 
-    /// The first search of a fresh install, and the replacement when
-    /// the last search is deleted.
+    /// The first search of a fresh install, and the US store a new search
+    /// starts at when no other search is in the US.
     static func defaultSearch() -> SavedSearch {
-        SavedSearch(productType: .iPhonePro18, storeNumber: "R032", storeName: "SoHo")
+        SavedSearch(productType: .iPhonePro18, countryCode: "US", storeNumber: "R032", storeName: "SoHo")
     }
 }

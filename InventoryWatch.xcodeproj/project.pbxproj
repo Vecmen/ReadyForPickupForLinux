@@ -23,10 +23,9 @@
 		3885D54C2891711E00BD6A78 /* FulfillmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D54B2891711E00BD6A78 /* FulfillmentStore.swift */; };
 		3885D54E2891713200BD6A78 /* PartAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D54D2891713200BD6A78 /* PartAvailability.swift */; };
 		3885D5502891714400BD6A78 /* ProductType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D54F2891714400BD6A78 /* ProductType.swift */; };
-		3885D5522891718600BD6A78 /* AllPhoneModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3885D5512891718600BD6A78 /* AllPhoneModels.swift */; };
 		38E20A012A6B0001000000C1 /* SavedSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E20A022A6B0001000000C1 /* SavedSearch.swift */; };
 		3891902D28E882070051FE3A /* Stores_LocalBootstrap.json in Resources */ = {isa = PBXBuildFile; fileRef = 3891902C28E882070051FE3A /* Stores_LocalBootstrap.json */; };
-		38E18B012A6B0001000000B1 /* iPhoneModelsCurrent-intl.json in Resources */ = {isa = PBXBuildFile; fileRef = 38E18B022A6B0001000000B1 /* iPhoneModelsCurrent-intl.json */; };
+		CF575A0A24669AA1F43C9366 /* ProductCatalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 17E3BE9A24E3D8F38F24BEC3 /* ProductCatalog.json */; };
 		3891902F28E8831B0051FE3A /* StoreBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3891902E28E8831B0051FE3A /* StoreBootstrap.swift */; };
 		3895BE94290B101B00FBC188 /* NotificationSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3895BE93290B101B00FBC188 /* NotificationSender.swift */; };
 		38D0C3A2273C60B500A7DE65 /* Countries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38D0C3A1273C60B500A7DE65 /* Countries.swift */; };
@@ -56,10 +55,9 @@
 		3885D54B2891711E00BD6A78 /* FulfillmentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FulfillmentStore.swift; sourceTree = "<group>"; };
 		3885D54D2891713200BD6A78 /* PartAvailability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartAvailability.swift; sourceTree = "<group>"; };
 		3885D54F2891714400BD6A78 /* ProductType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductType.swift; sourceTree = "<group>"; };
-		3885D5512891718600BD6A78 /* AllPhoneModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllPhoneModels.swift; sourceTree = "<group>"; };
 		38E20A022A6B0001000000C1 /* SavedSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedSearch.swift; sourceTree = "<group>"; };
 		3891902C28E882070051FE3A /* Stores_LocalBootstrap.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Stores_LocalBootstrap.json; sourceTree = "<group>"; };
-		38E18B022A6B0001000000B1 /* iPhoneModelsCurrent-intl.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "iPhoneModelsCurrent-intl.json"; sourceTree = "<group>"; };
+		17E3BE9A24E3D8F38F24BEC3 /* ProductCatalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ProductCatalog.json; sourceTree = "<group>"; };
 		3891902E28E8831B0051FE3A /* StoreBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreBootstrap.swift; sourceTree = "<group>"; };
 		3895BE93290B101B00FBC188 /* NotificationSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSender.swift; sourceTree = "<group>"; };
 		38D0C3A1273C60B500A7DE65 /* Countries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Countries.swift; sourceTree = "<group>"; };
@@ -88,7 +86,6 @@
 				3885D54F2891714400BD6A78 /* ProductType.swift */,
 				3885D54B2891711E00BD6A78 /* FulfillmentStore.swift */,
 				3891902E28E8831B0051FE3A /* StoreBootstrap.swift */,
-				3885D5512891718600BD6A78 /* AllPhoneModels.swift */,
 				38E20A022A6B0001000000C1 /* SavedSearch.swift */,
 				3885D54D2891713200BD6A78 /* PartAvailability.swift */,
 			);
@@ -122,7 +119,7 @@
 				3885D54A289170E700BD6A78 /* Model */,
 				38E1C21927E6714E0047703D /* Helpers.swift */,
 				3891902C28E882070051FE3A /* Stores_LocalBootstrap.json */,
-				38E18B022A6B0001000000B1 /* iPhoneModelsCurrent-intl.json */,
+				17E3BE9A24E3D8F38F24BEC3 /* ProductCatalog.json */,
 				386FDC67273A18F800C1BAC2 /* SKUData.swift */,
 				38D0C3A1273C60B500A7DE65 /* Countries.swift */,
 				386FDC5A2739DA7300C1BAC2 /* Assets.xcassets */,
@@ -223,7 +220,7 @@
 			files = (
 				38E4279E273EF542006BF6D7 /* Credits.rtf in Resources */,
 				3891902D28E882070051FE3A /* Stores_LocalBootstrap.json in Resources */,
-				38E18B012A6B0001000000B1 /* iPhoneModelsCurrent-intl.json in Resources */,
+				CF575A0A24669AA1F43C9366 /* ProductCatalog.json in Resources */,
 				386FDC5E2739DA7300C1BAC2 /* Preview Assets.xcassets in Resources */,
 				386FDC5B2739DA7300C1BAC2 /* Assets.xcassets in Resources */,
 			);
@@ -253,7 +250,6 @@
 				385886B12908280E003D3C80 /* FulfillmentModel.swift in Sources */,
 				38E20B012A6B0001000000D1 /* PushoverClient.swift in Sources */,
 				38D0C3A2273C60B500A7DE65 /* Countries.swift in Sources */,
-				3885D5522891718600BD6A78 /* AllPhoneModels.swift in Sources */,
 				38E20A012A6B0001000000C1 /* SavedSearch.swift in Sources */,
 				386FDC572739DA7300C1BAC2 /* InventoryWatchApp.swift in Sources */,
 				3885D5502891714400BD6A78 /* ProductType.swift in Sources */,

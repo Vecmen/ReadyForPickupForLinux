@@ -7,33 +7,14 @@
 
 import Foundation
 
-extension UserDefaults {
-
-    @objc dynamic var preferredStoreNumber: String {
-        get { string(forKey: "preferredStoreNumber") ?? "R032" }
-        set { setValue(newValue, forKey: "preferredStoreNumber") }
-    }
-}
-
 struct DefaultsVendor {
 
-    var preferredCountry: Country {
-        let value = UserDefaults.standard.string(forKey: "preferredCountry") ?? "US"
-
-        return Countries[value] ?? USData
-    }
-
-    var countryPathElement: String {
-        let country = preferredCountry
-        if country.shortcode == "US" {
-            return ""
-        } else {
-            return country.shortcode + "/"
-        }
-    }
-
-    var preferredStoreNumber: String {
-        get { return UserDefaults.standard.preferredStoreNumber }
-        set { UserDefaults.standard.preferredStoreNumber = newValue }
+    /// The country new searches start in (Settings). It keeps the key of
+    /// the app-wide country setting it replaced, which saved the United
+    /// Kingdom as "UK"; a code the catalog doesn't have reads as "US".
+    var defaultCountryCode: CountryCode {
+        let stored = UserDefaults.standard.string(forKey: "preferredCountry") ?? "US"
+        let code = stored == "UK" ? "GB" : stored
+        return Country.with(code: code) == nil ? "US" : code
     }
 }

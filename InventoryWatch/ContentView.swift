@@ -22,7 +22,7 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                Button { model.addSearch() } label: { Image(systemName: "plus") }
+                Button { Task { await model.addSearch() } } label: { Image(systemName: "plus") }
                     .help("Add a search")
             }
             ToolbarItemGroup(placement: .primaryAction) {
@@ -49,9 +49,6 @@ struct ContentView: View {
         }
         .task {
             await model.loadStores()
-            if let selected = model.selectedSearch {
-                _ = await model.skuData(for: selected.productType)
-            }
             NotificationManager.shared.requestNotificationPermissions()
             // Only the first window starts monitoring; it keeps running
             // after the window closes, so a reopened one doesn't restart it.
@@ -60,11 +57,9 @@ struct ContentView: View {
         .onChange(of: model.selectedSearchID) { _ in
             Task {
                 await model.loadStores()
-                if let selected = model.selectedSearch {
-                    _ = await model.skuData(for: selected.productType)
-                    if model.results[selected.id] == nil, model.isFetching(selected) == false {
-                        await model.fetchSelected()
-                    }
+                if let selected = model.selectedSearch,
+                   model.results[selected.id] == nil, model.isFetching(selected) == false {
+                    await model.fetchSelected()
                 }
             }
         }
@@ -237,11 +232,16 @@ struct ContentView: View {
 
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Product Type").font(.headline)
+                            // Only what the search's country sells.
+                            let products = model.productTypes(for: search)
                             Picker("", selection: productBinding) {
                                 ForEach(ProductCategory.allCases) { category in
-                                    Section(category.rawValue) {
-                                        ForEach(category.products) { product in
-                                            Text(product.presentableName).tag(product.rawValue)
+                                    let sold = category.products.filter { products.contains($0) }
+                                    if sold.isEmpty == false {
+                                        Section(category.rawValue) {
+                                            ForEach(sold) { product in
+                                                Text(product.presentableName).tag(product.rawValue)
+                                            }
                                         }
                                     }
                                 }
@@ -254,11 +254,11 @@ struct ContentView: View {
 
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Custom SKU").font(.headline)
-                            TextField("Part number (e.g. MHQJ4LL/A)", text: customSkuBinding)
+                            TextField("Part number (e.g. \(model.skuData(for: search)?.orderedSKUs.first ?? "MHQJ4LL/A"))", text: customSkuBinding)
                                 .textFieldStyle(.roundedBorder)
                             TextField("Nickname", text: customNameBinding)
                                 .textFieldStyle(.roundedBorder)
-                            Text("A custom model is watched alongside the models above and counts as a preferred model for notifications.")
+                            Text("A custom model is watched alongside the models above and counts as a preferred model for notifications. Use a part number from this search's country.")
                                 .font(.caption).foregroundColor(.secondary)
                         }
 
@@ -311,7 +311,7 @@ struct ContentView: View {
             Text("Notifications are only sent when preferred models are found.")
                 .font(.caption).foregroundColor(.secondary)
 
-            if let skuData = model.skuDataByProduct[search.productType] {
+            if let skuData = model.skuData(for: search) {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(skuData.orderedSKUs, id: \.self) { sku in
                         Toggle(isOn: preferredBinding(search: search, sku: sku)) {
@@ -323,7 +323,8 @@ struct ContentView: View {
                 .padding(8)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
             } else {
-                ProgressView().controlSize(.small)
+                Text("There are no models to watch for this product in this search's country.")
+                    .font(.caption).foregroundColor(.secondary)
             }
 
             Toggle("Only include results for preferred models", isOn: onlyPreferredBinding)
@@ -332,16 +333,40 @@ struct ContentView: View {
     }
 
     private func storeSection(for search: SavedSearch) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Preferred Store").font(.headline)
-            Picker("", selection: storeBinding) {
-                ForEach(model.stores, id: \.storeNumber) { store in
-                    Text("\(store.name) — \(store.address.cityStateDisplay)").tag(store.storeNumber)
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Country").font(.headline)
+                Picker("", selection: countryBinding) {
+                    ForEach(Country.all) { country in
+                        Text(country.name).tag(country.code)
+                    }
+                    if Country.with(code: search.countryCode) == nil {
+                        Text("\(search.countryCode) (not supported)").tag(search.countryCode)
+                    }
                 }
+                .labelsHidden()
+                Text("Changing the country picks a store there and clears this search's preferred models and custom SKU, since part numbers differ by country.")
+                    .font(.caption).foregroundColor(.secondary)
             }
-            .labelsHidden()
-            Toggle("Include results from nearby stores", isOn: nearbyBinding)
-                .toggleStyle(.checkbox)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Preferred Store").font(.headline)
+                let stores = model.stores(for: search)
+                Picker("", selection: storeBinding) {
+                    ForEach(stores, id: \.storeNumber) { store in
+                        Text("\(store.name) — \(store.address.cityStateDisplay)").tag(store.storeNumber)
+                    }
+                    // Stores still loading, or one that has closed since the
+                    // search was saved.
+                    if stores.contains(where: { $0.storeNumber == search.storeNumber }) == false {
+                        Text(stores.isEmpty ? model.storeName(for: search) : "\(model.storeName(for: search)) (not listed)")
+                            .tag(search.storeNumber)
+                    }
+                }
+                .labelsHidden()
+                Toggle("Include results from nearby stores", isOn: nearbyBinding)
+                    .toggleStyle(.checkbox)
+            }
         }
     }
 
@@ -354,10 +379,15 @@ struct ContentView: View {
                         search.productTypeRaw = newValue
                         search.preferredSKUs = []
                     }
-                    Task {
-                        if let selected = model.selectedSearch { _ = await model.skuData(for: selected.productType) }
-                        await model.fetchSelected()
-                    }
+                    Task { await model.fetchSelected() }
+                })
+    }
+
+    private var countryBinding: Binding<String> {
+        Binding(get: { model.selectedSearch?.countryCode ?? "US" },
+                set: { code in
+                    // Also picks a store there and refreshes.
+                    if let id = model.selectedSearch?.id { model.changeCountry(ofSearch: id, to: code) }
                 })
     }
 

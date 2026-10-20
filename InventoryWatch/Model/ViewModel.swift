@@ -20,8 +20,8 @@ final class ViewModel: ObservableObject {
     @Published var results: [UUID: [(FulfillmentStore, [PartAvailability])]] = [:]
     @Published var lastUpdated: [UUID: Date] = [:]
     @Published var searchErrors: [UUID: String] = [:]
-    @Published var stores: [RetailStore] = []
-    @Published var skuDataByProduct: [ProductType: SKUData] = [:]
+    /// Each country's stores (by Country.code), in the store picker's order.
+    @Published private(set) var storesByCountry: [CountryCode: [RetailStore]] = [:]
 
     // Fetches in flight per search. A count, not a flag: one search
     // can be fetched twice at once (e.g. edited during a sweep).
@@ -58,15 +58,40 @@ final class ViewModel: ObservableObject {
             autoRefreshIntervalMinutes = 5
             UserDefaults.standard.set(5, forKey: "preferredUpdateInterval")
         }
+
+        // Settings' default-country picker only offers catalog countries.
+        let defaultCountry = DefaultsVendor().defaultCountryCode
+        if Country.all.isEmpty == false,
+           let saved = UserDefaults.standard.string(forKey: "preferredCountry"), saved != defaultCountry {
+            UserDefaults.standard.set(defaultCountry, forKey: "preferredCountry")
+        }
     }
 
     var selectedSearch: SavedSearch? {
         searches.first(where: { $0.id == selectedSearchID }) ?? searches.first
     }
 
+    /// The stores of the search's country, in the store picker's order.
+    func stores(for search: SavedSearch) -> [RetailStore] {
+        storesByCountry[search.countryCode] ?? []
+    }
+
     func storeName(for search: SavedSearch) -> String {
-        stores.first(where: { $0.storeNumber == search.storeNumber })?.name
+        stores(for: search).first(where: { $0.storeNumber == search.storeNumber })?.name
             ?? search.storeName ?? search.storeNumber
+    }
+
+    /// The models watched for the search's product in its country; nil if
+    /// that country doesn't sell it.
+    func skuData(for search: SavedSearch) -> SKUData? {
+        SKUDataLoader.shared.skuData(for: search.productType, in: search.countryCode)
+    }
+
+    /// The products the search's country sells, plus the search's own
+    /// product if a catalog update dropped it, so it stays selected.
+    func productTypes(for search: SavedSearch) -> [ProductType] {
+        let sold = SKUDataLoader.shared.productTypes(in: search.countryCode)
+        return ProductType.allCases.filter { sold.contains($0) || $0 == search.productType }
     }
 
     func availableCount(for search: SavedSearch) -> Int {
@@ -80,44 +105,100 @@ final class ViewModel: ObservableObject {
         fetchesInFlight[search.id] != nil
     }
 
-    // MARK: - Stores & SKU data
+    // MARK: - Stores
 
+    /// Loads every supported country's stores, once (one bundled file).
     func loadStores() async {
-        if stores.isEmpty == false { return }
+        if storesByCountry.isEmpty == false { return }
         do {
-            stores = try await fulfillmentModel.storesForPreferredCountry()
-                .sorted { ($0.address.stateName ?? "") < ($1.address.stateName ?? "") }
+            let byLocale = try await fulfillmentModel.loadStoresByCountry()
+            var loaded: [CountryCode: [RetailStore]] = [:]
+            for country in Country.all {
+                guard let stores = byLocale[country.locale]?.stores else {
+                    logger.error("The store list has no \(country.locale, privacy: .public) stores for \(country.code, privacy: .public)")
+                    continue
+                }
+                loaded[country.code] = stores.sorted { ($0.address.stateName ?? "") < ($1.address.stateName ?? "") }
+            }
+            storesByCountry = loaded
             // Backfill store names on searches once stores are known.
             for idx in searches.indices {
-                searches[idx].storeName = stores.first(where: { $0.storeNumber == searches[idx].storeNumber })?.name ?? searches[idx].storeName
+                searches[idx].storeName = stores(for: searches[idx]).first(where: { $0.storeNumber == searches[idx].storeNumber })?.name ?? searches[idx].storeName
             }
         } catch {
             logger.error("Couldn't load the store list: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    func skuData(for productType: ProductType) async -> SKUData? {
-        if let cached = skuDataByProduct[productType] { return cached }
-        do {
-            let data = try await fulfillmentModel.skuData(for: productType)
-            skuDataByProduct[productType] = data
-            return data
-        } catch {
-            logger.error("Couldn't load models for \(productType.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            return nil
+    /// Where a search starts in `code`'s country: at `storeNumber` if it's
+    /// there, else at another search's store there, else at SoHo (the
+    /// default search's store) in the US, else at the first store listed
+    /// for that country. Nil if that country's stores aren't loaded.
+    private func store(in code: CountryCode, preferring storeNumber: String? = nil) -> RetailStore? {
+        let listed = storesByCountry[code] ?? []
+        let candidates = [storeNumber].compactMap { $0 }
+            + searches.filter { $0.countryCode == code }.map(\.storeNumber)
+            + [SearchStore.defaultSearch().storeNumber]
+        for candidate in candidates {
+            if let store = listed.first(where: { $0.storeNumber == candidate }) { return store }
         }
+        return listed.first
     }
 
     // MARK: - Search management
 
-    func addSearch() {
-        // Starts at the selected search's store.
-        let template = selectedSearch ?? SearchStore.defaultSearch()
-        let search = SavedSearch(productType: .iPhonePro18, storeNumber: template.storeNumber, storeName: template.storeName)
+    /// Adds a search in the default country (Settings) and refreshes it.
+    func addSearch() async {
+        await loadStores()
+        let search = newSearch()
         searches.append(search)
         selectedSearchID = search.id
         SearchStore.save(searches)
-        Task { await refreshSearch(id: search.id) }
+        await refreshSearch(id: search.id)
+    }
+
+    /// A search in the default country, at the selected search's store
+    /// when that's in the same country (see store(in:preferring:)).
+    private func newSearch() -> SavedSearch {
+        let code = DefaultsVendor().defaultCountryCode
+        guard let store = store(in: code, preferring: selectedSearch?.storeNumber) else {
+            return SearchStore.defaultSearch()
+        }
+        let sold = SKUDataLoader.shared.productTypes(in: code)
+        let product: ProductType = sold.contains(.iPhonePro18) ? .iPhonePro18 : sold.first ?? .iPhonePro18
+        return SavedSearch(productType: product, countryCode: code, storeNumber: store.storeNumber, storeName: store.name)
+    }
+
+    /// Moves a search to another country and refreshes it. Part numbers
+    /// differ by country, so its preferred models and custom SKU are
+    /// cleared. It keeps its store if that is in the new country (as for
+    /// a search saved before searches had countries, which loads as a US
+    /// search), else gets one there (see store(in:preferring:)), and gets
+    /// a product that country sells if it doesn't sell the search's.
+    func changeCountry(ofSearch id: UUID, to code: CountryCode) {
+        guard let idx = searches.firstIndex(where: { $0.id == id }), searches[idx].countryCode != code,
+              let store = store(in: code, preferring: searches[idx].storeNumber) else { return }
+        var search = searches[idx]
+        search.countryCode = code
+        search.storeNumber = store.storeNumber
+        search.storeName = store.name
+        search.preferredSKUs = []
+        search.customSku = ""
+        search.customSkuNickname = ""
+        let sold = SKUDataLoader.shared.productTypes(in: code)
+        if sold.contains(search.productType) == false {
+            // Same category first: an iPhone search stays an iPhone search.
+            let category = ProductCategory.allCases.first { $0.products.contains(search.productType) }
+            search.productType = sold.first { category?.products.contains($0) == true } ?? sold.first ?? search.productType
+        }
+        searches[idx] = search
+        // Shown results and sent alerts were for the old country's stores.
+        results[id] = nil
+        lastUpdated[id] = nil
+        searchErrors[id] = nil
+        lastNotifiedPreferredKeys[id] = nil
+        SearchStore.save(searches)
+        Task { await refreshSearch(id: id) }
     }
 
     func deleteSearch(id: UUID) {
@@ -134,7 +215,7 @@ final class ViewModel: ObservableObject {
         }
         if searches.isEmpty {
             // Never leave the app with zero searches.
-            searches = [SearchStore.defaultSearch()]
+            searches = [newSearch()]
             selectedSearchID = searches.first?.id
         }
         SearchStore.save(searches)
@@ -143,7 +224,7 @@ final class ViewModel: ObservableObject {
     func updateSelected(_ mutate: (inout SavedSearch) -> Void) {
         guard let id = selectedSearch?.id, let idx = searches.firstIndex(where: { $0.id == id }) else { return }
         mutate(&searches[idx])
-        searches[idx].storeName = stores.first(where: { $0.storeNumber == searches[idx].storeNumber })?.name ?? searches[idx].storeName
+        searches[idx].storeName = stores(for: searches[idx]).first(where: { $0.storeNumber == searches[idx].storeNumber })?.name ?? searches[idx].storeName
         SearchStore.save(searches)
     }
 
@@ -320,7 +401,7 @@ final class ViewModel: ObservableObject {
             // URLSession throws URLError(.cancelled) when the calling task
             // is cancelled; a cancelled fetch is not a failure.
             if Task.isCancelled { return nil }
-            logger.error("Fetch failed for \(search.productTypeRaw, privacy: .public) at \(search.storeNumber, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            logger.error("Fetch failed for \(search.productTypeRaw, privacy: .public) at \(search.storeNumber, privacy: .public) (\(search.countryCode, privacy: .public)): \(error.localizedDescription, privacy: .public)")
             if case AppError.throttled(let statusCode) = error { return statusCode }
             if currentVersion(of: search) != nil {
                 searchErrors[search.id] = error.localizedDescription
@@ -359,8 +440,6 @@ final class ViewModel: ObservableObject {
             return fresh.isEmpty ? nil : (store, fresh)
         }
 
-        // Not gated on skuDataByProduct: that cache only holds product
-        // types opened in the UI, and part names are already resolved.
         if search.notifyOnThisMac {
             Task {
                 await NotificationSender().sendNotificationIfNeeded(availableParts: newParts, search: search)

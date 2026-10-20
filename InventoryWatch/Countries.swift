@@ -7,34 +7,35 @@
 
 import Foundation
 
-struct Country: Hashable {
+/// A country whose Apple Stores can be watched. The list comes from
+/// ProductCatalog.json (see SKUDataLoader), which only has countries whose
+/// models were checked against that country's own pickup API.
+struct Country: Hashable, Identifiable, Sendable {
+    /// ISO 3166-1 alpha-2 code, e.g. "GB".
+    let code: CountryCode
+    /// English name, e.g. "United Kingdom".
     let name: String
-    let shortcode: String
+    /// The country's key in Stores_LocalBootstrap.json, e.g. "en_GB".
     let locale: String
-    let skuCode: String
+    /// Apple's storefront for the country, https://<storeHost>/<storePath>/
+    /// (e.g. www.apple.com/uk/). The US and China mainland
+    /// (www.apple.com.cn) have no path.
+    let storeHost: String
+    let storePath: String
+
+    var id: CountryCode { code }
+
+    /// The US first, then by English name. Empty only if the bundled
+    /// catalog couldn't be read.
+    static var all: [Country] { SKUDataLoader.shared.countries }
+
+    static func with(code: CountryCode) -> Country? {
+        all.first { $0.code == code }
+    }
+
+    /// A path on the country's storefront: "/uk/shop/buy-iphone/" for
+    /// "shop/buy-iphone/" in the UK, "/shop/buy-iphone/" in the US.
+    func storefrontPath(_ path: String) -> String {
+        storePath.isEmpty ? "/\(path)" : "/\(storePath)/\(path)"
+    }
 }
-
-let USData = Country(
-    name: "United States",
-    shortcode: "US",
-    locale: "en_US",
-    skuCode: "LL"
-)
-
-let AllCountries = [
-    USData,
-    Country(name: "Canada", shortcode: "CA", locale: "en_CA", skuCode: "LL"),
-    Country(name: "Australia", shortcode: "AU", locale: "en_AU", skuCode: "X"),
-    Country(name: "Germany", shortcode: "DE", locale: "de_DE", skuCode: "D"),
-    Country(name: "United Kingdom", shortcode: "UK", locale: "en_GB", skuCode: "B"),
-    Country(name: "South Korea", shortcode: "KR", locale: "ko_KR", skuCode: "KH"),
-    Country(name: "Hong Kong", shortcode: "HK", locale: "en_HK", skuCode: "ZP"),
-    Country(name: "France", shortcode: "FR", locale: "fr_FR", skuCode: "FN"),
-    Country(name: "Italy", shortcode: "IT", locale: "it_IT", skuCode: "T"),
-    Country(name: "Japan", shortcode: "JP", locale: "ja_JP", skuCode: "J"),
-    Country(name: "Austria", shortcode: "AT", locale: "de_AT", skuCode: "D"),
-    Country(name: "Netherlands", shortcode: "NL", locale: "nl_NL", skuCode: "N"),
-    Country(name: "Thailand", shortcode: "TH", locale: "th_TH", skuCode: "TH"),
-]
-let Countries: [CountryCode: Country] = Dictionary(uniqueKeysWithValues: AllCountries.map { ($0.shortcode, $0) })
-let OrderedCountries: [CountryCode] = AllCountries.map { $0.shortcode }

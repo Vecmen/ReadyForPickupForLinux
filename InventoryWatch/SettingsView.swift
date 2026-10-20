@@ -20,14 +20,17 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Text("Searches, products, stores and notifications are configured per search in the main window's right-hand inspector.")
+            Text("Searches, countries, products, stores and notifications are configured per search in the main window's right-hand inspector.")
                 .foregroundColor(.secondary)
 
-            Picker("Country (store list)", selection: $preferredCountry) {
-                ForEach(OrderedCountries, id: \.self) { code in
-                    Text(Countries[code]?.name ?? code).tag(code)
+            // Stored under the old app-wide setting's key (see DefaultsVendor).
+            Picker("Default country", selection: $preferredCountry) {
+                ForEach(Country.all) { country in
+                    Text(country.name).tag(country.code)
                 }
             }
+            Text("New searches start in this country, at a store there. Each search's own country is set in the inspector.")
+                .font(.caption).foregroundColor(.secondary)
 
             Picker("Auto-refresh every", selection: $preferredUpdateInterval) {
                 Text("Off").tag(0)
