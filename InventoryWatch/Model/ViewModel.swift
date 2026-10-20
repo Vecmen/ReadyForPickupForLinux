@@ -169,12 +169,12 @@ final class ViewModel: ObservableObject {
         return SavedSearch(productType: product, countryCode: code, storeNumber: store.storeNumber, storeName: store.name)
     }
 
-    /// Moves a search to another country and refreshes it. Part numbers
-    /// differ by country, so its preferred models and custom SKU are
-    /// cleared. It keeps its store if that is in the new country (as for
-    /// a search saved before searches had countries, which loads as a US
-    /// search), else gets one there (see store(in:preferring:)), and gets
-    /// a product that country sells if it doesn't sell the search's.
+    /// Moves a search to another country and refreshes it. It keeps its
+    /// store if that is in the new country, else gets one there (see
+    /// store(in:preferring:)), and gets a product that country sells if it
+    /// doesn't sell the search's. Most part numbers differ by country, so
+    /// it keeps the preferred models and custom SKU only if the new
+    /// country's models for the product include them.
     func changeCountry(ofSearch id: UUID, to code: CountryCode) {
         guard let idx = searches.firstIndex(where: { $0.id == id }), searches[idx].countryCode != code,
               let store = store(in: code, preferring: searches[idx].storeNumber) else { return }
@@ -182,14 +182,23 @@ final class ViewModel: ObservableObject {
         search.countryCode = code
         search.storeNumber = store.storeNumber
         search.storeName = store.name
-        search.preferredSKUs = []
-        search.customSku = ""
-        search.customSkuNickname = ""
         let sold = SKUDataLoader.shared.productTypes(in: code)
         if sold.contains(search.productType) == false {
             // Same category first: an iPhone search stays an iPhone search.
             let category = ProductCategory.allCases.first { $0.products.contains(search.productType) }
             search.productType = sold.first { category?.products.contains($0) == true } ?? sold.first ?? search.productType
+        }
+        let watched = Set(SKUDataLoader.shared.skuData(for: search.productType, in: code)?.orderedSKUs ?? [])
+        let hadPreferred = search.preferredSKUs.isEmpty == false || search.customSkuData != nil
+        search.preferredSKUs.removeAll { watched.contains($0) == false }
+        if let custom = search.customSkuData, watched.contains(custom.sku) == false {
+            search.customSku = ""
+            search.customSkuNickname = ""
+        }
+        // With none of them left, results filtered to preferred models
+        // would always be empty.
+        if hadPreferred, search.preferredSKUs.isEmpty, search.customSkuData == nil {
+            search.onlyPreferred = false
         }
         searches[idx] = search
         // Shown results and sent alerts were for the old country's stores.

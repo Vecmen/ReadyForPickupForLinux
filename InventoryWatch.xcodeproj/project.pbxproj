@@ -34,6 +34,8 @@
 
 		A10000012A6B000100000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A10000032A6B000100000003 /* Sparkle */; };
 		A10000042A6B000100000004 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000052A6B000100000005 /* Updater.swift */; };
+		A10000072A6B000100000007 /* LICENSE.md in Resources */ = {isa = PBXBuildFile; fileRef = A10000082A6B000100000008 /* LICENSE.md */; };
+		A10000092A6B000100000009 /* Sparkle-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = A100000A2A6B00010000000A /* Sparkle-LICENSE.txt */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -66,6 +68,8 @@
 
 		A10000052A6B000100000005 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
 		A10000062A6B000100000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000082A6B000100000008 /* LICENSE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = LICENSE.md; sourceTree = "<group>"; };
+		A100000A2A6B00010000000A /* Sparkle-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Sparkle-LICENSE.txt"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,6 +100,8 @@
 			isa = PBXGroup;
 			children = (
 				386FDC552739DA7300C1BAC2 /* InventoryWatch */,
+				A10000082A6B000100000008 /* LICENSE.md */,
+				A100000A2A6B00010000000A /* Sparkle-LICENSE.txt */,
 				386FDC542739DA7300C1BAC2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -219,6 +225,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				38E4279E273EF542006BF6D7 /* Credits.rtf in Resources */,
+				A10000072A6B000100000007 /* LICENSE.md in Resources */,
+				A10000092A6B000100000009 /* Sparkle-LICENSE.txt in Resources */,
 				3891902D28E882070051FE3A /* Stores_LocalBootstrap.json in Resources */,
 				CF575A0A24669AA1F43C9366 /* ProductCatalog.json in Resources */,
 				386FDC5E2739DA7300C1BAC2 /* Preview Assets.xcassets in Resources */,

@@ -345,7 +345,7 @@ struct ContentView: View {
                     }
                 }
                 .labelsHidden()
-                Text("Changing the country picks a store there and clears this search's preferred models and custom SKU, since part numbers differ by country.")
+                Text("Changing the country picks a store there. Most part numbers differ by country: preferred models and the custom SKU are kept only if that country's model list has them too.")
                     .font(.caption).foregroundColor(.secondary)
             }
 

@@ -53,7 +53,7 @@ actor FulfillmentModel {
             allSkus.append(custom.sku)
         }
 
-        let location = try await pickupLocation(storeNumber: search.storeNumber, in: country)
+        let location = try await pickupLocation(for: search, in: country)
         let filter: Set<String>? = search.onlyPreferred
             ? Set(search.preferredSKUs).union(search.customSkuData.map { [$0.sku] } ?? [])
             : nil
@@ -103,14 +103,29 @@ actor FulfillmentModel {
 
     /// pickup-message takes a city / postal-code `location`, not an
     /// R### store number. Resolve it from the country's store list; a
-    /// store that isn't listed (e.g. closed) has no location to send.
-    private func pickupLocation(storeNumber: String, in country: Country) async throws -> String {
-        guard let store = try await stores(in: country).first(where: { $0.storeNumber == storeNumber }) else {
+    /// store that isn't listed (e.g. closed) has no location to send,
+    /// except one in closedStoreLocations for a search that includes
+    /// nearby stores (they are all it can find).
+    private func pickupLocation(for search: SavedSearch, in country: Country) async throws -> String {
+        guard let store = try await stores(in: country).first(where: { $0.storeNumber == search.storeNumber }) else {
+            if search.includeNearby, let location = Self.closedStoreLocations[country.locale]?[search.storeNumber] {
+                return location
+            }
             throw AppError.storeNotListed
         }
         if let postal = store.address.postalCode, postal.isEmpty == false { return postal }
         return store.address.cityStateDisplay
     }
+
+    /// Stores the 2026-10 store-list refresh dropped (closed) in countries
+    /// searches could be saved in before it, by locale, with the postal
+    /// code those searches sent.
+    private static let closedStoreLocations: [String: [String: String]] = [
+        "en_AU": ["R458": "2077"],
+        "en_GB": ["R252": "BS1 3BZ"],
+        "en_US": ["R052": "95014", "R063": "21204", "R141": "60062", "R198": "96815",
+                  "R218": "48038", "R285": "92025", "R463": "28216", "R629": "06611"],
+    ]
 
     private func parseStoreResponse(_ responseData: Data?, response: HTTPURLResponse?, skuData: SKUData, search: SavedSearch) throws -> [FulfillmentStore] {
         guard let responseData = responseData else {

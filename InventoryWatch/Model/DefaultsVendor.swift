@@ -9,12 +9,18 @@ import Foundation
 
 struct DefaultsVendor {
 
-    /// The country new searches start in (Settings). It keeps the key of
-    /// the app-wide country setting it replaced, which saved the United
-    /// Kingdom as "UK"; a code the catalog doesn't have reads as "US".
-    var defaultCountryCode: CountryCode {
+    /// The country stored under the key of the app-wide country setting
+    /// that 0.3.4 and earlier used for every search, and that saved the
+    /// United Kingdom as "UK". Codes the catalog doesn't have are kept.
+    var storedCountryCode: CountryCode {
         let stored = UserDefaults.standard.string(forKey: "preferredCountry") ?? "US"
-        let code = stored == "UK" ? "GB" : stored
+        return stored == "UK" ? "GB" : stored
+    }
+
+    /// The country new searches start in (Settings): the stored country,
+    /// or the US if the catalog doesn't have it.
+    var defaultCountryCode: CountryCode {
+        let code = storedCountryCode
         return Country.with(code: code) == nil ? "US" : code
     }
 }

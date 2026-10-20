@@ -1,7 +1,8 @@
 #!/bin/zsh
 # Build a Developer ID-signed, notarized, Sparkle-ready ReadyForPickup DMG.
 #
-# Flow: build Release (unsigned) -> sign Sparkle nested code then the app
+# Flow: check the bundled data (Scripts/check-bundled-data.py) -> build
+# Release (unsigned) -> sign Sparkle nested code then the app
 # (entitlements with the bundle ID filled in, then checked) -> DMG ->
 # notarize (notarytool --wait) -> staple -> generate/sign appcast.
 # The script prints the DMG path, its SHA-256, and the generated appcast.xml
@@ -31,6 +32,10 @@ WORK=/tmp/readyforpickup-release
 APP="$WORK/DerivedData/Build/Products/Release/ReadyForPickup.app"
 DMG="$WORK/ReadyForPickup-$VERSION.dmg"
 rm -rf "$WORK"; mkdir -p "$WORK"
+
+# The app decodes each bundled data file as a whole, so one bad value in
+# either would ship an app with no countries or no stores.
+python3 -I Scripts/check-bundled-data.py
 
 xcodebuild -project InventoryWatch.xcodeproj -scheme InventoryWatch \
   -configuration Release -derivedDataPath "$WORK/DerivedData" \

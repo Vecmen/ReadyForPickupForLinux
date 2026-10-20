@@ -122,6 +122,8 @@ class AppleClient:
     With `cache_dir`, every final response (2xx, 3xx, 404) is saved there
     and served from disk on the next run, so an interrupted run resumes
     without repeating requests. Throttled and 5xx responses are never cached.
+    Saved responses never expire; `oldest_cached` is the save time of the
+    oldest one served.
     After a throttled response every later gap is doubled (up to 4x), and
     `max_requests` stops the run before it sends more than that many.
     """
@@ -137,6 +139,7 @@ class AppleClient:
         self.log = log
         self.requests = 0
         self.cache_hits = 0
+        self.oldest_cached = None
         # Also wait before the first request, so back-to-back runs stay paced.
         self._last_request = time.monotonic()
         self._opener = urllib.request.build_opener(_NoRedirect())
@@ -231,6 +234,9 @@ class AppleClient:
             return None
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         body = (self.cache_dir / f"{key}.body").read_bytes()
+        saved = meta.get("fetchedAt")       # UTC ISO 8601: compares as text
+        if saved and (self.oldest_cached is None or saved < self.oldest_cached):
+            self.oldest_cached = saved
         return Response(meta["url"], meta["status"], meta["headers"], body, cached=True)
 
     def _write_cache(self, key: str, referer: str | None, resp: Response) -> None:

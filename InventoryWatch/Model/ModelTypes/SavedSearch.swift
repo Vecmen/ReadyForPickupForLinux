@@ -61,9 +61,11 @@ struct SavedSearch: Codable, Identifiable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
         productTypeRaw = try c.decode(String.self, forKey: .productTypeRaw)
-        // Added with per-search countries. Searches saved before then are
-        // US searches, the only country the app had complete data for.
-        countryCode = try c.decodeIfPresent(String.self, forKey: .countryCode) ?? "US"
+        // Added with per-search countries. Before then every search used
+        // the app-wide country setting (its store list, storefront and
+        // part numbers), so a search saved then gets that country, even
+        // one the catalog doesn't have. SearchStore.load saves it.
+        countryCode = try c.decodeIfPresent(String.self, forKey: .countryCode) ?? DefaultsVendor().storedCountryCode
         storeNumber = try c.decode(String.self, forKey: .storeNumber)
         storeName = try c.decodeIfPresent(String.self, forKey: .storeName)
         includeNearby = try c.decodeIfPresent(Bool.self, forKey: .includeNearby) ?? true
@@ -113,6 +115,10 @@ enum SearchStore {
         if let data = UserDefaults.standard.data(forKey: key),
            let decoded = try? JSONDecoder().decode([SavedSearch].self, from: data),
            decoded.isEmpty == false {
+            // Saved now, so a search from before searches had countries
+            // keeps the one it decoded with (see init(from:)) when the
+            // default country, stored under the same key, changes.
+            save(decoded)
             return decoded
         }
         let initial = [defaultSearch()]

@@ -62,16 +62,24 @@ Usage (Python 3.9+, standard library only). Apple's pickup API answers HTTP
 541 for about half an hour once it has seen roughly 40-60 calls from one
 address (in 2026-10 that happened at 30 and 100 seconds per call alike), and
 each country needs about 10 pickup calls plus 7 page loads. So refresh a few
-countries per run, about an hour apart, always with the same --cache-dir:
-    Scripts/update-catalog.py --only GB,JP,FR,DE --cache-dir ~/rfp-cache
-    Scripts/update-catalog.py --only CH,NL --cache-dir ~/rfp-cache --dry-run \
+countries per run, about an hour apart, all with one new --cache-dir per
+refresh:
+    Scripts/update-catalog.py --only GB,JP,FR,DE --cache-dir ~/rfp-cache/2026-10-19
+    Scripts/update-catalog.py --only CH,NL --cache-dir ~/rfp-cache/2026-10-19 --dry-run \
         --report-json /tmp/catalog-report.json
     Scripts/update-catalog.py --us-seed us.json ...  # first run only: the US entry
 The cache makes reruns free (the US check runs once per cache), and a run that
 is still throttled after the client's 60-second and 5-minute waits stops
-without writing anything; rerun it later with the same --cache-dir. Use a new
-cache directory to see Apple's current data. Run Scripts/update-store-list.py
-first so verification uses the current stores.
+without writing anything; rerun it later with the same --cache-dir. Cached
+responses never expire, so a cache directory from an earlier refresh replays
+Apple's data from then (the script notes cached responses older than a day).
+Run Scripts/update-store-list.py first so verification uses the current stores.
+
+Every run prints what it changes in the file, per country and product (also
+with --dry-run). A country already in the file that can't be rebuilt (it
+fails verification, or the store list lost its stores) keeps its current
+entry, and the script exits with status 1; --drop-failed removes such
+countries among those refreshed instead.
 """
 
 from __future__ import annotations
@@ -85,7 +93,7 @@ import sys
 import unicodedata
 import urllib.parse
 from collections import Counter
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -731,6 +739,46 @@ def sort_countries(countries: list) -> list:
     return us + rest
 
 
+def describe_changes(old: dict | None, countries: list) -> list:
+    """One line per country that `countries` changes in the current file."""
+    def models(country: dict, ptype: str) -> dict:
+        return {item["sku"]: item["name"] for item in country.get("products", {}).get(ptype, [])}
+
+    before = {c["code"]: c for c in (old or {}).get("countries", [])}
+    after = {c["code"]: c for c in countries}
+    lines = []
+    for code in sorted(set(before) | set(after)):
+        if code not in after:
+            lines.append(f"{code}: REMOVED")
+            continue
+        if code not in before:
+            lines.append(f"{code}: added, {sum(len(items) for items in after[code]['products'].values())} SKUs")
+            continue
+        notes = [f"{key} {before[code].get(key)!r} -> {after[code][key]!r}"
+                 for key in ("name", "locale", "storeHost", "storePath")
+                 if before[code].get(key) != after[code][key]]
+        ptypes = set(before[code].get("products", {})) | set(after[code]["products"])
+        known = [p for p in PRODUCT_TYPES if p in ptypes]
+        for ptype in known + sorted(ptypes - set(known)):
+            was, now = models(before[code], ptype), models(after[code], ptype)
+            if not now or not was:
+                notes.append(f"{ptype} {'removed' if was else 'added'} ({len(was or now)} SKUs)")
+                continue
+            added = [sku for sku in now if sku not in was]
+            removed = [sku for sku in was if sku not in now]
+            renamed = [sku for sku in now if sku in was and was[sku] != now[sku]]
+            change = [f"+{len(added)} {added}"] if added else []
+            change += [f"-{len(removed)} {removed}"] if removed else []
+            change += [f"{len(renamed)} renamed"] if renamed else []
+            if not change and list(was) != list(now):
+                change.append("reordered")
+            if change:
+                notes.append(f"{ptype} " + ", ".join(change))
+        if notes:
+            lines.append(f"{code}: " + "; ".join(notes))
+    return lines
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--cache-dir", type=Path, help="save Apple responses here and reuse them on later runs")
@@ -743,6 +791,9 @@ def main() -> int:
                         help="stop (writing nothing) before sending more Apple requests than this (default 600)")
     parser.add_argument("--pickup-interval", type=float, default=PICKUP_INTERVAL,
                         help=f"seconds between pickup requests (default {PICKUP_INTERVAL:g})")
+    parser.add_argument("--drop-failed", action="store_true",
+                        help="remove a country already in the file that is refreshed (see --only) but can't be "
+                             "rebuilt; by default it keeps its current entry and the script exits with status 1")
     args = parser.parse_args()
 
     old = json.loads(args.output.read_text(encoding="utf-8")) if args.output.exists() else None
@@ -772,6 +823,16 @@ def main() -> int:
         report["us"] = us_report
 
         entries = [us_entry]
+        kept = []           # countries in the file that failed and kept their entry
+
+        def keep_or_drop(code: str, problem: str, may_drop: bool = True) -> None:
+            if args.drop_failed and may_drop:
+                log(f"   {code} {problem}: removing it from {args.output.name} (--drop-failed)")
+                return
+            log(f"   WARNING: {code} {problem}: keeping its current entry in {args.output.name}")
+            entries.append(old_entries[code])
+            kept.append(code)
+
         for locale in sorted(stores):
             if locale == "en_US" or locale not in COUNTRIES:
                 continue
@@ -789,6 +850,15 @@ def main() -> int:
                 log(f"   left out: {item}")
             if entry:
                 entries.append(entry)
+            elif code in old_entries:
+                keep_or_drop(code, "failed")
+        # Countries in the file whose locale the loop didn't reach.
+        for code in sorted(set(old_entries) - set(report["countries"]) - {entry["code"] for entry in entries}):
+            locale = old_entries[code]["locale"]
+            log(f"{code}: {old_entries[code]['name']}")
+            keep_or_drop(code, f"has no COUNTRIES entry for {locale}" if locale in stores
+                         else f"has no stores for {locale} in {STORE_FILE.name}",
+                         may_drop=only is None or code in only)
     except AppleError as error:
         print(f"error: {error}. Nothing was written; re-run later with the same --cache-dir.", file=sys.stderr)
         return 2
@@ -803,10 +873,19 @@ def main() -> int:
     catalog = {"generatedAt": generated, "countries": countries}
     text = serialize(catalog)
 
+    if client.oldest_cached:
+        saved = datetime.fromisoformat(client.oldest_cached)
+        if datetime.now(timezone.utc) - saved > timedelta(days=1):
+            log(f"note: this run used responses saved in --cache-dir as long ago as {saved.date().isoformat()}; "
+                "they never expire. Use a new cache directory to check Apple's current data.")
     us = report["us"]
     log(f"US drift: new {us['new'] or 'none'}; missing from pages {us['missingFromPages'] or 'none'}; "
         f"not verified by pickup {us['notVerified'] or 'none'}; new pages {us['newPages'] or 'none'}")
     log(f"Included: {', '.join(c['code'] for c in countries)}")
+    changes = describe_changes(old, countries)
+    log(f"Changes to {args.output.name}:" + ("" if changes else " none"))
+    for line in changes:
+        log(f"   {line}")
     if unknown:
         log(f"Store-list locales without a COUNTRIES entry (add them): {', '.join(unknown)}")
     if args.report_json:
@@ -819,6 +898,11 @@ def main() -> int:
     else:
         args.output.write_text(text, encoding="utf-8")
         log(f"wrote {args.output}")
+    if kept:
+        print(f"error: kept the current entries of {', '.join(kept)} in {args.output.name}, which could not be "
+              "rebuilt (see the warnings above). Fix the cause and rerun, or remove them with --only and "
+              "--drop-failed.", file=sys.stderr)
+        return 1
     return 0
 
 
