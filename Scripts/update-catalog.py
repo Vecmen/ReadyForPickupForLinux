@@ -565,7 +565,7 @@ def build_country(client: AppleClient, locale: str, stores: list, us_entry: dict
         if not failed or slug == SUFFIX_PAGE:
             continue
         page_suffix, parts = mac_page_suffix(client, host, path, slug, report)
-        entry_parts += [part for part in parts if part not in entry_parts]
+        entry_parts = entry_parts + [part for part in parts if part not in entry_parts]
         if page_suffix and page_suffix != suffix:
             for ptype in failed:
                 macs[ptype] = [base + page_suffix for base, _, _ in us_bases[ptype]]
