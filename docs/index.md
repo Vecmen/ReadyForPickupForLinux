@@ -10,7 +10,7 @@ Download the `.dmg` from the latest release, open it, and drag ReadyForPickup in
 
 ## What it does
 
-- Watches Apple Store pickup stock for current iPhones and Macs in 15 countries: the US, Australia, Austria, Canada, China mainland, France, Germany, India, Italy, Japan, Malaysia, South Korea, Spain, the United Arab Emirates and the UK (in versions after 0.3.4; earlier versions watch iPhones in the US only)
+- Watches Apple Store pickup stock for current iPhones and Macs in 15 countries: the US, Australia, Austria, Canada, China mainland, France, Germany, India, Italy, Japan, Malaysia, South Korea, Spain, the United Arab Emirates and the UK (from version 0.3.5; 0.3.4 and earlier support US stores only)
 - Multiple saved searches, each with its own country, store and preferred models
 - Alerts on this Mac, and optional Pushover phone notifications (bring your own Pushover app token)
 - Auto-refresh with throttle backoff, and Sparkle auto-updates from version 0.3.3 onward
