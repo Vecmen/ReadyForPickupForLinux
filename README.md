@@ -33,6 +33,10 @@ The app bundles two data files, each rebuilt by a script (Python 3.9+, standard 
 
 Run `update-store-list.py` before every release (stores open and close), and before `update-catalog.py`, which checks models at real stores. Run `update-catalog.py` when Apple's lineup changes (new iPhones each September, new Macs) after updating the US entry, or to add a country (see `COUNTRIES` in the script). A new product line also needs a `ProductType` case and an entry in the script's page tables. After editing either file by hand, run `Scripts/check-bundled-data.py`: the app reads each file as a whole, so one bad value would drop every country or store.
 
+## App icon
+
+The app icon and the project site's logo (`docs/logo.png`) are drawn in code by `Scripts/make-app-icon.swift`: a white paper shopping bag with grey rope handles and a green check, on a blue macOS icon tile. It uses neither Apple's logo nor SF Symbols, which may not appear in app icons. To change the icon, edit the script and run `swift Scripts/make-app-icon.swift`; it rewrites every size in `InventoryWatch/Assets.xcassets/AppIcon.appiconset` and the site logo.
+
 ## Auto-updates (Sparkle)
 
 ReadyForPickup uses [Sparkle 2.10.0](https://github.com/sparkle-project/Sparkle) (MIT — see `Sparkle-LICENSE.txt`) to check for updates automatically (daily, on by default; toggle in Settings → Software Updates, or use **ReadyForPickup → Check for Updates…**).
