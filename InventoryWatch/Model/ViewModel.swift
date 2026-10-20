@@ -7,6 +7,7 @@
 
 import Foundation
 import os
+import UserNotifications
 
 private let logger = Logger(subsystem: "com.wehbs.ReadyForPickup", category: "Inventory")
 
@@ -37,6 +38,13 @@ final class ViewModel: ObservableObject {
     @Published var pushoverEnabled: Bool = PushoverSettings.isEnabled
     @Published var pushoverConfigured: Bool = PushoverSettings.isConfigured
     @Published var pushoverFeedback: String?
+
+    @Published private(set) var macNotificationsEnabled: Bool = MacNotificationSettings.isEnabled
+    /// What macOS allows (System Settings > Notifications). Refreshed at
+    /// launch and whenever the app becomes active, e.g. after the user
+    /// changes it there.
+    @Published private(set) var macNotificationStatus: UNAuthorizationStatus = .notDetermined
+    @Published var macNotificationFeedback: String?
 
     private var autoRefreshTask: Task<Void, Never>?
     private var sweepTask: Task<Void, Never>?
@@ -361,6 +369,59 @@ final class ViewModel: ObservableObject {
         refreshPushoverState()
     }
 
+    // MARK: - Mac notifications
+
+    /// Mac notifications will be shown: on in Settings and allowed by macOS.
+    var macNotificationsActive: Bool {
+        macNotificationsEnabled && (macNotificationStatus == .authorized || macNotificationStatus == .provisional)
+    }
+
+    /// At launch: asks macOS for permission (its one-time prompt) if Mac
+    /// notifications are on and the user has never answered.
+    func prepareMacNotifications() async {
+        NotificationManager.shared.configure()
+        await refreshMacNotificationStatus()
+        if macNotificationsEnabled, macNotificationStatus == .notDetermined {
+            await NotificationManager.shared.requestAuthorization()
+            await refreshMacNotificationStatus()
+        }
+    }
+
+    func refreshMacNotificationStatus() async {
+        macNotificationStatus = await NotificationManager.shared.authorizationStatus()
+    }
+
+    /// The Settings toggle. Turning it on asks macOS for permission, or,
+    /// once the user has said no there (macOS asks only once), opens
+    /// System Settings, the only place that can change it. Turning it off
+    /// stops Mac notifications without touching macOS's setting.
+    func setMacNotificationsEnabled(_ enabled: Bool) async {
+        macNotificationsEnabled = enabled
+        MacNotificationSettings.isEnabled = enabled
+        macNotificationFeedback = nil
+        guard enabled else { return }
+        await refreshMacNotificationStatus()
+        switch macNotificationStatus {
+        case .notDetermined:
+            await NotificationManager.shared.requestAuthorization()
+            await refreshMacNotificationStatus()
+        case .denied:
+            NotificationManager.openSystemSettings()
+        default:
+            break
+        }
+    }
+
+    func sendTestMacNotification() async {
+        await refreshMacNotificationStatus()
+        guard macNotificationsActive else {
+            macNotificationFeedback = "Mac notifications are off. Turn them on above first."
+            return
+        }
+        NotificationManager.shared.sendNotification(title: "ReadyForPickup test", body: "Mac notifications are working.")
+        macNotificationFeedback = "Test sent. No banner? Check Focus, and note that macOS hides banners while the screen is shared or mirrored; it's still in Notification Center."
+    }
+
     /// The refresh interval, or longer while Apple is throttling.
     private func currentAutoRefreshDelay() -> TimeInterval {
         var delay = TimeInterval(autoRefreshIntervalMinutes * 60)
@@ -449,7 +510,9 @@ final class ViewModel: ObservableObject {
             return fresh.isEmpty ? nil : (store, fresh)
         }
 
-        if search.notifyOnThisMac {
+        // Also gated on the app-wide switch in Settings; macOS drops it
+        // anyway if it doesn't allow the app's notifications.
+        if search.notifyOnThisMac, macNotificationsEnabled {
             Task {
                 await NotificationSender().sendNotificationIfNeeded(availableParts: newParts, search: search)
             }

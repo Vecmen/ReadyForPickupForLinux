@@ -61,6 +61,31 @@ struct SettingsView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 8) {
+                Text("Mac notifications").font(.headline)
+                // On only when macOS allows them too; turning it on asks
+                // macOS, or opens System Settings if the user said no there.
+                Toggle("Enable Mac notifications", isOn: Binding(
+                    get: { model.macNotificationsActive },
+                    set: { on in Task { await model.setMacNotificationsEnabled(on) } }))
+                Text(macNotificationsCaption)
+                    .font(.caption).foregroundColor(.secondary)
+                HStack {
+                    if model.macNotificationsEnabled, model.macNotificationStatus == .denied {
+                        Button("Open Notification Settings…") { NotificationManager.openSystemSettings() }
+                    }
+                    Button("Send test notification") {
+                        Task { await model.sendTestMacNotification() }
+                    }
+                    .disabled(model.macNotificationsActive == false)
+                }
+                if let feedback = model.macNotificationFeedback {
+                    Text(feedback).font(.caption)
+                }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Pushover (push to your phone)").font(.headline)
                 Text("Pushover requires your own account and app token: install Pushover on your iPhone, register an application at pushover.net/apps, then paste your User Key and that app's API Token below. Keys are stored in your Mac's Keychain, never in the app.")
                     .font(.caption).foregroundColor(.secondary)
@@ -94,5 +119,25 @@ struct SettingsView: View {
         }
         .padding(20)
         .frame(width: 420)
+        .task { await model.refreshMacNotificationStatus() }
+        // Picks up a change made in System Settings.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await model.refreshMacNotificationStatus() }
+        }
+    }
+
+    private var macNotificationsCaption: String {
+        if model.macNotificationsActive {
+            return "On. Banners, sounds and Focus follow System Settings > Notifications > ReadyForPickup. Each search can also turn them off in the inspector."
+        }
+        if model.macNotificationsEnabled == false {
+            return "Off: ReadyForPickup sends no Mac notifications."
+        }
+        switch model.macNotificationStatus {
+        case .denied:
+            return "macOS has notifications turned off for ReadyForPickup, and only System Settings can turn them back on: turn on Allow notifications there, then come back."
+        default:
+            return "Turn this on and macOS will ask whether ReadyForPickup may send notifications."
+        }
     }
 }

@@ -49,10 +49,14 @@ struct ContentView: View {
         }
         .task {
             await model.loadStores()
-            NotificationManager.shared.requestNotificationPermissions()
+            await model.prepareMacNotifications()
             // Only the first window starts monitoring; it keeps running
             // after the window closes, so a reopened one doesn't restart it.
             await model.startMonitoring()
+        }
+        // Picks up a notification change made in System Settings.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await model.refreshMacNotificationStatus() }
         }
         .onChange(of: model.selectedSearchID) { _ in
             Task {
@@ -265,6 +269,13 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Notifications").font(.headline)
                             Toggle("Send inventory notifications on this Mac", isOn: notifyBinding)
+                            // Not while macOS's first prompt is still unanswered.
+                            if search.notifyOnThisMac, model.macNotificationsEnabled == false || model.macNotificationStatus == .denied {
+                                Text(model.macNotificationsEnabled
+                                     ? "macOS has notifications turned off for ReadyForPickup, so none will appear. Turn them on in Settings (Cmd-,)."
+                                     : "Mac notifications are off in Settings (Cmd-,), so none will appear.")
+                                    .font(.caption).foregroundColor(.orange)
+                            }
                             Toggle("Send Pushover notifications", isOn: pushoverBinding)
                             Text(model.pushoverConfigured
                                  ? "Notifications are sent when a preferred model is newly found. Pushover is configured in Settings."
@@ -282,7 +293,7 @@ struct ContentView: View {
 
     private func banner(for search: SavedSearch) -> some View {
         // Only claim channels that are actually active for this search.
-        let macOn = search.notifyOnThisMac
+        let macOn = search.notifyOnThisMac && model.macNotificationsActive
         let pushoverOn = search.notifyViaPushover && model.pushoverConfigured
         let channels: String = [macOn ? "on this Mac" : nil, pushoverOn ? "via Pushover" : nil]
             .compactMap { $0 }.joined(separator: " and ")
@@ -301,7 +312,7 @@ struct ContentView: View {
             Spacer()
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.green.opacity((search.notifyOnThisMac || (search.notifyViaPushover && model.pushoverConfigured)) ? 0.10 : 0.04)))
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.green.opacity(channels.isEmpty == false ? 0.10 : 0.04)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15)))
     }
 
@@ -352,18 +363,14 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Preferred Store").font(.headline)
                 let stores = model.stores(for: search)
-                Picker("", selection: storeBinding) {
-                    ForEach(stores, id: \.storeNumber) { store in
-                        Text("\(store.name) — \(store.address.cityStateDisplay)").tag(store.storeNumber)
-                    }
-                    // Stores still loading, or one that has closed since the
-                    // search was saved.
-                    if stores.contains(where: { $0.storeNumber == search.storeNumber }) == false {
-                        Text(stores.isEmpty ? model.storeName(for: search) : "\(model.storeName(for: search)) (not listed)")
-                            .tag(search.storeNumber)
-                    }
-                }
-                .labelsHidden()
+                let current = stores.first(where: { $0.storeNumber == search.storeNumber })
+                // Not listed: stores still loading, or one that has closed
+                // since the search was saved.
+                StoreChooser(stores: stores,
+                             selectedStoreNumber: search.storeNumber,
+                             selectedLabel: current.map { "\($0.name) — \($0.address.cityStateDisplay)" }
+                                ?? (stores.isEmpty ? model.storeName(for: search) : "\(model.storeName(for: search)) (not listed)"),
+                             choose: { storeBinding.wrappedValue = $0 })
                 Toggle("Include results from nearby stores", isOn: nearbyBinding)
                     .toggleStyle(.checkbox)
             }
@@ -434,5 +441,94 @@ struct ContentView: View {
     private var customNameBinding: Binding<String> {
         Binding(get: { model.selectedSearch?.customSkuNickname ?? "" },
                 set: { value in model.updateSelected { $0.customSkuNickname = value } })
+    }
+}
+
+/// The store picker: a button showing the search's store that opens a
+/// searchable list of the country's stores (hundreds in the US).
+private struct StoreChooser: View {
+    let stores: [RetailStore]
+    let selectedStoreNumber: String
+    let selectedLabel: String
+    let choose: (String) -> Void
+
+    @State private var isPresented = false
+    @State private var query = ""
+    @FocusState private var searchFieldFocused: Bool
+
+    var body: some View {
+        Button { isPresented = true } label: {
+            HStack {
+                Text(selectedLabel).lineLimit(1)
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.up.chevron.down").foregroundColor(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .disabled(stores.isEmpty)
+        .popover(isPresented: $isPresented, arrowEdge: .leading) { popover }
+    }
+
+    /// Every word of the query must appear in the store's name, city, state
+    /// or postal code, ignoring case and accents ("zurich" finds Zürich).
+    private var matches: [RetailStore] {
+        let words = query.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard words.isEmpty == false else { return stores }
+        return stores.filter { store in
+            let fields = [store.name, store.address.city, store.address.stateName ?? "",
+                          store.address.stateCode ?? "", store.address.postalCode ?? ""]
+            return words.allSatisfy { word in fields.contains { $0.localizedStandardContains(word) } }
+        }
+    }
+
+    private var popover: some View {
+        VStack(spacing: 0) {
+            TextField("Search by store, city, state or postal code", text: $query)
+                .textFieldStyle(.roundedBorder)
+                .focused($searchFieldFocused)
+                // Return picks the first match.
+                .onSubmit { if let first = matches.first { pick(first) } }
+                .padding(10)
+            Divider()
+            let found = matches
+            if found.isEmpty {
+                Text("No stores match “\(query)”.")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollViewReader { proxy in
+                    List(found, id: \.storeNumber) { store in
+                        Button { pick(store) } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(store.name)
+                                    Text(store.address.cityStateDisplay)
+                                        .font(.caption).foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if store.storeNumber == selectedStoreNumber {
+                                    Image(systemName: "checkmark").foregroundColor(.accentColor)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .listStyle(.plain)
+                    .onAppear { proxy.scrollTo(selectedStoreNumber, anchor: .center) }
+                }
+            }
+        }
+        .frame(width: 340, height: 420)
+        .onAppear {
+            query = ""
+            // Focus once the popover is on screen.
+            DispatchQueue.main.async { searchFieldFocused = true }
+        }
+    }
+
+    private func pick(_ store: RetailStore) {
+        isPresented = false
+        if store.storeNumber != selectedStoreNumber { choose(store.storeNumber) }
     }
 }
