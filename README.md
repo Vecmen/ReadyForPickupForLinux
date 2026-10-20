@@ -8,6 +8,10 @@ ReadyForPickup — a macOS app that watches Apple Store pickup availability for 
 
 **[Download ReadyForPickup.dmg](https://github.com/wehbs/ReadyForPickup/releases/latest/download/ReadyForPickup.dmg)** (always the latest version), open it, and drag ReadyForPickup into Applications. Earlier versions and release notes are on the **[Releases page](https://github.com/wehbs/ReadyForPickup/releases)**. Or use the project site: https://wehbs.github.io/ReadyForPickup/
 
+## Native iOS companion
+
+A native SwiftUI companion for iPhone and iPad is available in [`ios/`](ios/README.md). It supports iOS 17 or later and builds locally in Xcode. See the iOS guide for setup, verification flows, and the limitations of background inventory checks.
+
 ## About this fork
 
 This is a modernized fork of [worthbak's InventoryWatch](https://github.com/worthbak/inventory-checker-app) (thanks, Worth!). Since the 2023 upstream release it has been updated for macOS 13+, Apple's current pickup API, the current iPhone and Mac lineup in 15 countries, a 2.0-style three-pane interface with multiple saved searches, auto-refresh with throttle backoff, and Pushover phone notifications (bring your own Pushover app token, entered in Settings). It was renamed from InventoryWatch to ReadyForPickup in October 2026 and relaunched as a new app (bundle ID `com.wehbs.ReadyForPickup`), so nothing carries over from InventoryWatch: saved searches, preferences and Pushover keys start fresh.

@@ -66,3 +66,15 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Local iOS development and verification output
+.DS_Store
+*.xcuserstate
+artifacts/
+*.xcarchive/
+*.app/
+*.mobileprovision
+*.p12
+*.p8
+.env
+.env.*
