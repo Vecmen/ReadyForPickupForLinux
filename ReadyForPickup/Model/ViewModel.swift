@@ -523,10 +523,12 @@ final class ViewModel: ObservableObject {
         // failures are logged and surfaced, never crash the refresh.
         if search.notifyViaPushover, PushoverSettings.isConfigured {
             let alert = PushoverClient.stockMessage(for: search, parts: newParts)
+            let highPriority = PushoverSettings.highPriorityAlerts
             Task {
                 do {
                     try await PushoverClient.send(title: alert.title, message: alert.message,
-                                                  url: alert.url, urlTitle: alert.urlTitle)
+                                                  url: alert.url, urlTitle: alert.urlTitle,
+                                                  highPriority: highPriority)
                     logger.info("Pushover alert sent for \(search.productTypeRaw, privacy: .public)")
                 } catch {
                     logger.error("Pushover send failed: \(error.localizedDescription, privacy: .public)")

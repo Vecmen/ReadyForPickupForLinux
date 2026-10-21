@@ -14,6 +14,8 @@ struct SettingsView: View {
     @EnvironmentObject var updater: UpdaterViewModel
     @AppStorage("preferredCountry") private var preferredCountry = "US"
     @AppStorage("preferredUpdateInterval") private var preferredUpdateInterval: Int = 5
+    // Read by PushoverSettings.highPriorityAlerts.
+    @AppStorage("pushoverHighPriority") private var pushoverHighPriority = false
     @State private var pushoverUserKey: String = PushoverSettings.userKey
     @State private var pushoverApiToken: String = PushoverSettings.apiToken
     @State private var isSendingTest = false
@@ -48,6 +50,13 @@ struct SettingsView: View {
             }
             Text("Searches refresh automatically, one after another, while the app is running - even with its window closed. To re-check now, use the toolbar refresh button or File > Refresh Selected Search (Cmd-R), or File > Refresh All Searches (Shift-Cmd-R); either also resets the schedule. If Apple starts refusing requests, the app waits longer between refreshes, up to an hour, until Apple answers again.")
                 .font(.caption).foregroundColor(.secondary)
+            // On 2026-10-21 the app alone, every 2 minutes, got 31 answers
+            // and then 20-30 minutes of refusals, four times in a row; it was
+            // never refused at 12 an hour.
+            if requestsPerHour >= 20 {
+                Text("That's about \(requestsPerHour) requests an hour, one per search per refresh. Apple answers about 31 in an hour and a half, then refuses every device on your network for up to half an hour, so the app will miss stretches. Under 20 an hour, such as one search every 5 minutes, it keeps answering.")
+                    .font(.caption).foregroundColor(.orange)
+            }
 
             Divider()
 
@@ -100,6 +109,10 @@ struct SettingsView: View {
                 SecureField("Application API Token", text: $pushoverApiToken)
                     .onChange(of: pushoverApiToken) { PushoverSettings.apiToken = $0; model.refreshPushoverState() }
 
+                Toggle("Send stock alerts at high priority", isOn: $pushoverHighPriority)
+                Text("High-priority alerts get through your Pushover quiet hours, always with sound, and show in red. Test notifications stay at normal priority.")
+                    .font(.caption).foregroundColor(.secondary)
+
                 HStack {
                     Button("Send test notification") {
                         isSendingTest = true
@@ -125,6 +138,12 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await model.refreshMacNotificationStatus() }
         }
+    }
+
+    /// Auto-refresh's pickup requests an hour: one per search per refresh
+    /// (two for a search watching more than 20 models).
+    private var requestsPerHour: Int {
+        preferredUpdateInterval > 0 ? model.searches.count * 60 / preferredUpdateInterval : 0
     }
 
     private var macNotificationsCaption: String {
