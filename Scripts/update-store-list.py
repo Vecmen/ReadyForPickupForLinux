@@ -166,10 +166,6 @@ class AppleClient:
         return Response(url, status, headers, body)
 
     def _get_once(self, url: str, referer: str | None, expect_json: bool, min_interval: float) -> Response:
-        host = urllib.parse.urlsplit(url).hostname
-        if host not in ALLOWED_HOSTS:
-            raise AppleError(f"refusing to fetch non-Apple host {host}: {url}")
-
         key = hashlib.sha256(f"{url}\n{referer or ''}".encode()).hexdigest()[:32]
         cached = self._read_cache(key)
         if cached:
@@ -196,6 +192,9 @@ class AppleClient:
         return resp
 
     def _fetch(self, url: str, referer: str | None, expect_json: bool, min_interval: float):
+        host = urllib.parse.urlsplit(url).hostname
+        if host not in ALLOWED_HOSTS:
+            raise AppleError(f"refusing to fetch non-Apple host {host}: {url}")
         if self.max_requests is not None and self.requests >= self.max_requests:
             raise AppleError(f"request budget of {self.max_requests} reached before {url}")
         gap = max(self.interval, min_interval) * self.slowdown
