@@ -24,11 +24,13 @@ struct LaunchHours: Equatable, Sendable {
     static let defaultStart = 8 * 60
     static let defaultEnd = 9 * 60
 
-    /// On 2026-10-21 the app alone, one search every 2 minutes, got 31
-    /// answers from Apple and then 20-30 minutes of HTTP 541, four times in
-    /// a row: about 31 requests in an hour and a half, or 20 an hour.
-    static let maxRequestsPerHour = 20
+    /// On 2026-10-21 the app alone, one search every 2 minutes, got exactly
+    /// 31 answers from Apple and then 20-30 minutes of HTTP 541 for the
+    /// whole network, four times in a row, each time with those 31 in the
+    /// last 94 minutes. Launch hours keep any 94 minutes to 30 requests.
     static let requestsAppleAnswers = 31
+    static let requestBudget = requestsAppleAnswers - 1
+    static let budgetMinutes = 94
 
     static var stored: LaunchHours {
         let defaults = UserDefaults.standard
@@ -52,19 +54,44 @@ struct LaunchHours: Equatable, Sendable {
     /// On, with a window that opens.
     var isActive: Bool { isEnabled && minutes > 0 }
 
-    /// Minutes between refreshes during launch hours: at least 2, and long
-    /// enough that a refresh's `requestsPerSweep` requests (one per search,
-    /// two for a search watching more than 20 models) come to at most
-    /// maxRequestsPerHour an hour. One search: every 3 minutes.
-    static func intervalMinutes(requestsPerSweep: Int) -> Int {
-        max(2, (requestsPerSweep * 60 + maxRequestsPerHour - 1) / maxRequestsPerHour)
+    /// Minutes between refreshes during launch hours: the fewest, from 2,
+    /// that keep any 94 minutes to requestBudget requests, counting
+    /// Auto-refresh's (every `autoRefreshMinutes`, 0 = Off) in the part of
+    /// those 94 minutes outside the window. A refresh sends
+    /// `requestsPerSweep`: one per search, two for a search watching more
+    /// than 20 models. One search with Auto-refresh Off: every 2 minutes in
+    /// a window of up to an hour, 3 up to an hour and a half, 4 beyond.
+    func intervalMinutes(requestsPerSweep: Int, autoRefreshMinutes: Int) -> Int {
+        let span = min(minutes, Self.budgetMinutes)
+        func fewest(besides around: Int) -> Int? {
+            (2..<Self.budgetMinutes).first { interval in
+                requestsPerSweep * ((span + interval - 1) / interval) + around <= Self.requestBudget
+            }
+        }
+        let fitting = fewest(besides: requestsAround(requestsPerSweep: requestsPerSweep,
+                                                     autoRefreshMinutes: autoRefreshMinutes))
+        // Never slower than an Auto-refresh that keeps to the budget by
+        // itself: going on at its pace in the window keeps to it too.
+        if Self.keepsToBudget(requestsPerSweep: requestsPerSweep, everyMinutes: autoRefreshMinutes) {
+            return min(fitting ?? autoRefreshMinutes, autoRefreshMinutes)
+        }
+        // Auto-refresh alone sends more (Settings warns): keep the window
+        // itself to the budget.
+        return fitting ?? fewest(besides: 0) ?? Self.budgetMinutes
     }
 
-    /// Requests one day's window sends at most: a refresh when it opens,
-    /// then one every interval until it closes.
-    func requestsPerWindow(requestsPerSweep: Int) -> Int {
-        let interval = Self.intervalMinutes(requestsPerSweep: requestsPerSweep)
-        return (minutes + interval - 1) / interval * requestsPerSweep
+    /// Whether refreshing every `everyMinutes` (0 = Off) keeps any 94
+    /// minutes to requestBudget requests.
+    static func keepsToBudget(requestsPerSweep: Int, everyMinutes: Int) -> Bool {
+        everyMinutes > 0 && requestsPerSweep * ((budgetMinutes + everyMinutes - 1) / everyMinutes) <= requestBudget
+    }
+
+    /// Requests Auto-refresh (every `autoRefreshMinutes`, 0 = Off) sends in
+    /// the part of 94 minutes that a window shorter than that leaves.
+    func requestsAround(requestsPerSweep: Int, autoRefreshMinutes: Int) -> Int {
+        guard autoRefreshMinutes > 0, minutes < Self.budgetMinutes else { return 0 }
+        let gap = Self.budgetMinutes - minutes
+        return requestsPerSweep * ((gap + autoRefreshMinutes - 1) / autoRefreshMinutes)
     }
 
     /// The window open at `date`; nil when none is, or launch hours are off.

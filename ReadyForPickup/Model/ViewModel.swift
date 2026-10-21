@@ -397,8 +397,10 @@ final class ViewModel: ObservableObject {
     /// Auto-refresh's intervals: launch hours' while the window is open,
     /// the Auto-refresh setting's otherwise.
     private var schedule: AutoRefreshSchedule {
-        AutoRefreshSchedule(autoRefreshMinutes: autoRefreshIntervalMinutes, launchHours: launchHours,
-                            launchHoursMinutes: LaunchHours.intervalMinutes(requestsPerSweep: requestsPerSweep))
+        let launchHoursMinutes = launchHours.intervalMinutes(requestsPerSweep: requestsPerSweep,
+                                                             autoRefreshMinutes: autoRefreshIntervalMinutes)
+        return AutoRefreshSchedule(autoRefreshMinutes: autoRefreshIntervalMinutes, launchHours: launchHours,
+                                   launchHoursMinutes: launchHoursMinutes)
     }
 
     /// Re-reads Pushover config after Settings edits.

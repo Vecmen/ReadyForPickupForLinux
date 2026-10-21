@@ -174,28 +174,36 @@ struct SettingsView: View {
 
     private var launchHoursCaption: String {
         let hours = launchHoursSetting
-        let interval = LaunchHours.intervalMinutes(requestsPerSweep: model.requestsPerSweep)
-        let pace = "as often as the app can while sending at most \(LaunchHours.maxRequestsPerHour) requests an hour, one per search per refresh"
         guard hours.isEnabled else {
-            return "Turn this on to refresh searches every \(interval) minutes in a daily window, such as the hours stock drops at a launch: \(pace)."
+            return "Turn this on to refresh searches more often in a daily window, such as the hours stock drops at a launch."
         }
         guard hours.minutes > 0 else {
             return "From and To are the same time, so launch hours never start."
         }
+        let requests = model.requestsPerSweep
+        let interval = hours.intervalMinutes(requestsPerSweep: requests, autoRefreshMinutes: preferredUpdateInterval)
         let end = time(hours.end) + (hours.end < hours.start ? " the next day" : "")
-        var caption = "Every day from \(time(hours.start)) to \(end), searches refresh every \(interval) minutes: \(pace). At other times they follow Auto-refresh above, which can be Off."
-        if preferredUpdateInterval > 0, preferredUpdateInterval < interval {
-            caption += " That's slower than Auto-refresh above, which Apple will refuse at times."
+        var caption = "Every day from \(time(hours.start)) to \(end), searches refresh every \(interval) minutes: as often as keeps the app to \(LaunchHours.requestBudget) requests in any hour and a half (Apple answers about \(LaunchHours.requestsAppleAnswers)), counting Auto-refresh's outside the window. At other times they follow Auto-refresh above, which can be Off."
+        // What would make launch hours refresh more often.
+        var hour = hours
+        hour.end = (hours.start + 60) % (24 * 60)
+        let withoutAutoRefresh = hours.intervalMinutes(requestsPerSweep: requests, autoRefreshMinutes: 0)
+        let hourLong = hour.intervalMinutes(requestsPerSweep: requests, autoRefreshMinutes: preferredUpdateInterval)
+        if preferredUpdateInterval > 0, withoutAutoRefresh < interval {
+            caption += " With Auto-refresh Off they'd refresh every \(withoutAutoRefresh) minutes."
+        } else if hours.minutes > 60, hourLong < interval {
+            caption += " An hour-long window would refresh every \(hourLong) minutes."
         }
         return caption
     }
 
-    /// Shown when one day's window would send more than Apple answers
-    /// before refusing (LaunchHours.requestsAppleAnswers).
+    /// Shown when Auto-refresh by itself sends more than requestBudget in
+    /// an hour and a half: launch hours can't keep the app under it then.
     private var launchHoursWarning: String? {
-        let requests = launchHoursSetting.requestsPerWindow(requestsPerSweep: model.requestsPerSweep)
-        guard requests >= LaunchHours.requestsAppleAnswers else { return nil }
-        return "This window sends up to \(requests) requests. Apple answers about \(LaunchHours.requestsAppleAnswers) in an hour and a half, then refuses every device on your network for up to half an hour, so the app may be refused before the window ends. A shorter window avoids that."
+        guard launchHoursSetting.minutes > 0, preferredUpdateInterval > 0,
+              LaunchHours.keepsToBudget(requestsPerSweep: model.requestsPerSweep, everyMinutes: preferredUpdateInterval) == false
+        else { return nil }
+        return "Auto-refresh above sends more than Apple answers, so the app may be refused during launch hours too. Set it to refresh less often, or Off."
     }
 
     // Launch hours' times are minutes after midnight on the Mac's clock,
