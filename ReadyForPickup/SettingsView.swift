@@ -75,6 +75,12 @@ struct SettingsView: View {
             .disabled(launchHoursEnabled == false)
             Text(launchHoursCaption)
                 .font(.caption).foregroundColor(.secondary)
+                // Always 7 lines while on, the longest caption at 420 pt.
+                // Settings keeps its height, so when this wrapped to a line
+                // more or less, the caption above shrank or grew and the
+                // pickers moved under the pointer as From or To changed.
+                .lineLimit(7, reservesSpace: launchHoursEnabled)
+                .fixedSize(horizontal: false, vertical: true)
             if launchHoursEnabled, let warning = launchHoursWarning {
                 Text(warning)
                     .font(.caption).foregroundColor(.orange)
