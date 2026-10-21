@@ -22,7 +22,7 @@ Project site: https://wehbs.github.io/ReadyForPickup/
 
 ## Countries
 
-Each search watches one country's stores. Pick the country in the search's inspector, above the store picker: changing it picks a store there and keeps the search's preferred models and custom SKU only if that country's model list has them too (most part numbers differ by country). **Settings → Default country** sets where new searches start.
+Each search watches one country's stores. Pick the country in the search's inspector, above the store picker: changing it picks a store there and keeps the search's preferred models and custom SKU only if that country's model list has them too (most part numbers differ by country). **Settings → General → Default country** sets where new searches start.
 
 Supported: the United States, Australia, Austria, Canada, China mainland, France, Germany, India, Italy, Japan, Malaysia, South Korea, Spain, the United Arab Emirates and the United Kingdom. Every model watched in a country was found in that country's own pickup API. Outside the US, iPhone names are Apple's local ones (e.g. Japanese or French); Mac names are the US spec names. Not supported: Hong Kong (its pickup API rejects the store locations the app sends), Macao (no online store), and Apple's other store countries (Belgium, Brazil, Mexico, the Netherlands, Singapore, Sweden, Switzerland, Taiwan, Thailand and Türkiye) until their models are verified.
 
@@ -43,7 +43,7 @@ The site's link-preview image (`docs/social-preview.png`, the picture X and othe
 
 ## Auto-updates (Sparkle)
 
-ReadyForPickup uses [Sparkle 2.10.0](https://github.com/sparkle-project/Sparkle) (MIT — see `Sparkle-LICENSE.txt`) to check for updates automatically (daily, on by default; toggle in Settings → Software Updates, or use **ReadyForPickup → Check for Updates…**).
+ReadyForPickup uses [Sparkle 2.10.0](https://github.com/sparkle-project/Sparkle) (MIT — see `Sparkle-LICENSE.txt`) to check for updates automatically (daily, on by default; toggle in Settings → Updates, or use **ReadyForPickup → Check for Updates…**).
 
 - **Update feed:** `https://raw.githubusercontent.com/wehbs/ReadyForPickup/main/appcast.xml` — a file in this repo (on `main`), chosen so releases are version-controlled, reviewable, and don't depend on a separate hosting service. The DMG enclosures it points to are GitHub Release assets.
 - **Signing key:** updates are EdDSA-signed. The *private* key lives only in the maintainer's Mac login Keychain (created by Sparkle's `generate_keys`; service `https://sparkle-project.org`, account `ed25519`) — it is never in this repo. Only the public key (`SUPublicEDKey`) is embedded in the app's `Info.plist`.

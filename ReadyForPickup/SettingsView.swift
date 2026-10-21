@@ -8,7 +8,8 @@
 import SwiftUI
 
 /// Per-search settings now live in the main window's inspector
-/// (2.0-style layout). This scene keeps only app-wide preferences.
+/// (2.0-style layout). This scene keeps only app-wide preferences, in
+/// tabs short enough to show every caption in full on a 900 pt screen.
 struct SettingsView: View {
     @EnvironmentObject var model: ViewModel
     @EnvironmentObject var updater: UpdaterViewModel
@@ -25,9 +26,26 @@ struct SettingsView: View {
     @State private var isSendingTest = false
 
     var body: some View {
+        TabView {
+            general
+                .tabItem { Label("General", systemImage: "gearshape") }
+            notifications
+                .tabItem { Label("Notifications", systemImage: "bell") }
+            updates
+                .tabItem { Label("Updates", systemImage: "arrow.triangle.2.circlepath") }
+        }
+        .task { await model.refreshMacNotificationStatus() }
+        // Picks up a change made in System Settings.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await model.refreshMacNotificationStatus() }
+        }
+    }
+
+    private var general: some View {
         Form {
             Text("Searches, countries, products, stores and notifications are configured per search in the main window's right-hand inspector.")
                 .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             // Stored under the old app-wide setting's key (see DefaultsVendor).
             Picker("Default country", selection: $preferredCountry) {
@@ -36,7 +54,7 @@ struct SettingsView: View {
                 }
             }
             Text("New searches start in this country, at a store there. Each search's own country is set in the inspector.")
-                .font(.caption).foregroundColor(.secondary)
+                .caption()
 
             Picker("Auto-refresh every", selection: $preferredUpdateInterval) {
                 Text("Off").tag(0)
@@ -53,13 +71,13 @@ struct SettingsView: View {
                 model.restartAutoRefresh(withMinutes: newValue)
             }
             Text("Searches refresh automatically, one after another, while the app is running - even with its window closed. To re-check now, use the toolbar refresh button or File > Refresh Selected Search (Cmd-R), or File > Refresh All Searches (Shift-Cmd-R); either also resets the schedule. If Apple starts refusing requests, the app waits longer between refreshes, up to an hour, until Apple answers again.")
-                .font(.caption).foregroundColor(.secondary)
+                .caption()
             // On 2026-10-21 the app alone, every 2 minutes, got 31 answers
             // and then 20-30 minutes of refusals, four times in a row; it was
             // never refused at 12 an hour.
             if requestsPerHour >= 20 {
                 Text("That's about \(requestsPerHour) requests an hour, one per search per refresh. Apple answers about 31 in an hour and a half, then refuses every device on your network for up to half an hour, so the app will miss stretches. Under 20 an hour, such as one search every 5 minutes, it keeps answering.")
-                    .font(.caption).foregroundColor(.orange)
+                    .caption(.orange)
             }
 
             Toggle("Check more often during launch hours", isOn: $launchHoursEnabled)
@@ -74,30 +92,21 @@ struct SettingsView: View {
             .environment(\.timeZone, Self.utc)
             .disabled(launchHoursEnabled == false)
             Text(launchHoursCaption)
-                .font(.caption).foregroundColor(.secondary)
-                // Always 7 lines while on, the longest caption at 420 pt.
-                // Settings keeps its height, so when this wrapped to a line
-                // more or less, the caption above shrank or grew and the
-                // pickers moved under the pointer as From or To changed.
+                // Always 7 lines while on, the longest caption at 420 pt, so
+                // Settings keeps its height as From or To change and nothing
+                // moves under the pointer.
                 .lineLimit(7, reservesSpace: launchHoursEnabled)
-                .fixedSize(horizontal: false, vertical: true)
+                .caption()
             if launchHoursEnabled, let warning = launchHoursWarning {
                 Text(warning)
-                    .font(.caption).foregroundColor(.orange)
+                    .caption(.orange)
             }
+        }
+        .settingsTab()
+    }
 
-            Divider()
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Software Updates").font(.headline)
-                Toggle("Automatically check for updates", isOn: $updater.automaticallyChecksForUpdates)
-                CheckForUpdatesView(updater: updater)
-                Text("Updates are downloaded from GitHub via Sparkle. Version 0.3.2 and earlier can't install updates: download 0.3.3 or later once from the Releases page.")
-                    .font(.caption).foregroundColor(.secondary)
-            }
-
-            Divider()
-
+    private var notifications: some View {
+        Form {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Mac notifications").font(.headline)
                 // On only when macOS allows them too; turning it on asks
@@ -106,7 +115,7 @@ struct SettingsView: View {
                     get: { model.macNotificationsActive },
                     set: { on in Task { await model.setMacNotificationsEnabled(on) } }))
                 Text(macNotificationsCaption)
-                    .font(.caption).foregroundColor(.secondary)
+                    .caption()
                 HStack {
                     if model.macNotificationsEnabled, model.macNotificationStatus == .denied {
                         Button("Open Notification Settings…") { NotificationManager.openSystemSettings() }
@@ -117,7 +126,7 @@ struct SettingsView: View {
                     .disabled(model.macNotificationsActive == false)
                 }
                 if let feedback = model.macNotificationFeedback {
-                    Text(feedback).font(.caption)
+                    Text(feedback).caption(.primary)
                 }
             }
 
@@ -126,7 +135,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Pushover (push to your phone)").font(.headline)
                 Text("Pushover requires your own account and app token: install Pushover on your iPhone, register an application at pushover.net/apps, then paste your User Key and that app's API Token below. Keys are stored in your Mac's Keychain, never in the app.")
-                    .font(.caption).foregroundColor(.secondary)
+                    .caption()
 
                 Toggle("Enable Pushover notifications", isOn: Binding(
                     get: { model.pushoverEnabled },
@@ -139,7 +148,7 @@ struct SettingsView: View {
 
                 Toggle("Send stock alerts at high priority", isOn: $pushoverHighPriority)
                 Text("High-priority alerts get through your Pushover quiet hours, always with sound, and show in red. Test notifications stay at normal priority.")
-                    .font(.caption).foregroundColor(.secondary)
+                    .caption()
 
                 HStack {
                     Button("Send test notification") {
@@ -151,21 +160,28 @@ struct SettingsView: View {
                 }
                 if pushoverUserKey.isEmpty || pushoverApiToken.isEmpty {
                     Text("Enter both keys to enable the test button. With invalid keys, Pushover's own error is shown here.")
-                        .font(.caption).foregroundColor(.secondary)
+                        .caption()
                 }
                 if let feedback = model.pushoverFeedback {
-                    Text(feedback).font(.caption)
-                        .foregroundColor(feedback.hasPrefix("Test sent") ? .green : .red)
+                    Text(feedback)
+                        .caption(feedback.hasPrefix("Test sent") ? .green : .red)
                 }
             }
         }
-        .padding(20)
-        .frame(width: 420)
-        .task { await model.refreshMacNotificationStatus() }
-        // Picks up a change made in System Settings.
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            Task { await model.refreshMacNotificationStatus() }
+        .settingsTab()
+    }
+
+    private var updates: some View {
+        Form {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Software Updates").font(.headline)
+                Toggle("Automatically check for updates", isOn: $updater.automaticallyChecksForUpdates)
+                CheckForUpdatesView(updater: updater)
+                Text("Updates are downloaded from GitHub via Sparkle. Version 0.3.2 and earlier can't install updates: download 0.3.3 or later once from the Releases page.")
+                    .caption()
+            }
         }
+        .settingsTab()
     }
 
     /// Auto-refresh's pickup requests an hour: one per search per refresh
@@ -249,5 +265,19 @@ struct SettingsView: View {
         default:
             return "Turn this on and macOS will ask whether ReadyForPickup may send notifications."
         }
+    }
+}
+
+private extension View {
+    /// A setting's caption, shown in full. Without fixedSize, Settings made
+    /// its window too short and cut captions off after one line.
+    func caption(_ color: Color = .secondary) -> some View {
+        font(.caption).foregroundColor(color).fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// One tab of Settings: 420 pt wide and as tall as its settings. The
+    /// window grows and shrinks from its bottom edge to fit.
+    func settingsTab() -> some View {
+        padding(20).frame(width: 420)
     }
 }
