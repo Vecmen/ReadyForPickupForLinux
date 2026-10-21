@@ -14,6 +14,8 @@ struct SettingsView: View {
     @EnvironmentObject var updater: UpdaterViewModel
     @AppStorage("preferredCountry") private var preferredCountry = "US"
     @AppStorage("preferredUpdateInterval") private var preferredUpdateInterval: Int = 5
+    // Read by PushoverSettings.highPriorityAlerts.
+    @AppStorage("pushoverHighPriority") private var pushoverHighPriority = false
     @State private var pushoverUserKey: String = PushoverSettings.userKey
     @State private var pushoverApiToken: String = PushoverSettings.apiToken
     @State private var isSendingTest = false
@@ -99,6 +101,10 @@ struct SettingsView: View {
                     .onChange(of: pushoverUserKey) { PushoverSettings.userKey = $0; model.refreshPushoverState() }
                 SecureField("Application API Token", text: $pushoverApiToken)
                     .onChange(of: pushoverApiToken) { PushoverSettings.apiToken = $0; model.refreshPushoverState() }
+
+                Toggle("Send stock alerts at high priority", isOn: $pushoverHighPriority)
+                Text("High-priority alerts get through your Pushover quiet hours, always with sound, and show in red. Test notifications stay at normal priority.")
+                    .font(.caption).foregroundColor(.secondary)
 
                 HStack {
                     Button("Send test notification") {

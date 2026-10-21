@@ -7,7 +7,8 @@ import Foundation
 import Security
 
 /// App-wide Pushover configuration.
-/// - Enable flag: UserDefaults (`pushoverEnabled`, not a secret).
+/// - Enable flag and stock-alert priority: UserDefaults
+///   (`pushoverEnabled`, `pushoverHighPriority`; not secrets).
 /// - User Key + Application API Token: macOS Keychain generic
 ///   passwords (NOT UserDefaults). Per Pushover's licensing guidance
 ///   for redistributed apps, every user registers their OWN
@@ -17,6 +18,13 @@ enum PushoverSettings {
     static var isEnabled: Bool {
         get { UserDefaults.standard.bool(forKey: "pushoverEnabled") }
         set { UserDefaults.standard.set(newValue, forKey: "pushoverEnabled") }
+    }
+
+    /// Stock alerts (not test messages) go out at Pushover's high
+    /// priority, which gets through the user's quiet hours. Set in
+    /// Settings (SettingsView's @AppStorage).
+    static var highPriorityAlerts: Bool {
+        UserDefaults.standard.bool(forKey: "pushoverHighPriority")
     }
 
     static var userKey: String {
@@ -92,7 +100,10 @@ enum PushoverError: LocalizedError {
 /// Single-attempt Pushover sender (no retry loop).
 struct PushoverClient {
     /// `url` is shown under the message as a link titled `urlTitle`.
-    static func send(title: String, message: String, url: URL? = nil, urlTitle: String? = nil) async throws {
+    /// `highPriority` sends Pushover priority 1 instead of 0: it gets
+    /// through quiet hours, always with sound, and shows in red.
+    static func send(title: String, message: String, url: URL? = nil, urlTitle: String? = nil,
+                     highPriority: Bool = false) async throws {
         guard PushoverSettings.isConfigured else { throw PushoverError.notConfigured }
 
         // Pushover message limit is 1024 characters.
@@ -105,7 +116,7 @@ struct PushoverClient {
             URLQueryItem(name: "user", value: PushoverSettings.userKey),
             URLQueryItem(name: "title", value: title),
             URLQueryItem(name: "message", value: truncated),
-            URLQueryItem(name: "priority", value: "0")
+            URLQueryItem(name: "priority", value: highPriority ? "1" : "0")
         ]
         if let url {
             components.queryItems?.append(URLQueryItem(name: "url", value: url.absoluteString))
