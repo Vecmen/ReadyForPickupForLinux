@@ -36,6 +36,27 @@ actor FulfillmentModel {
         return stores
     }
 
+    /// Apple's cap on part numbers in one pickup request.
+    static let partsPerRequest = 20
+
+    /// The part numbers a fetch of `search` asks about: `skuData`'s models,
+    /// then the search's custom SKU.
+    static func partNumbers(for search: SavedSearch, in skuData: SKUData) -> [String] {
+        var skus = skuData.orderedSKUs
+        if let custom = search.customSkuData, skus.contains(custom.sku) == false {
+            skus.append(custom.sku)
+        }
+        return skus
+    }
+
+    /// Pickup requests one fetch of `search` sends: one per 20 part
+    /// numbers, none if its country doesn't sell its product.
+    static func requestCount(for search: SavedSearch) -> Int {
+        guard let skuData = SKUDataLoader.shared.skuData(for: search.productType, in: search.countryCode) else { return 0 }
+        let parts = partNumbers(for: search, in: skuData).count
+        return (parts + partsPerRequest - 1) / partsPerRequest
+    }
+
     /// Fetches inventory for one saved search against its country's
     /// pickup endpoint. Requests are chunked at 20 parts (Apple's cap)
     /// and merged by store.
@@ -48,10 +69,7 @@ actor FulfillmentModel {
             throw AppError.productNotSold
         }
 
-        var allSkus = skuData.orderedSKUs
-        if let custom = search.customSkuData, allSkus.contains(custom.sku) == false {
-            allSkus.append(custom.sku)
-        }
+        let allSkus = Self.partNumbers(for: search, in: skuData)
 
         let location = try await pickupLocation(for: search, in: country)
         let filter: Set<String>? = search.onlyPreferred
@@ -60,8 +78,8 @@ actor FulfillmentModel {
 
         var merged: [String: FulfillmentStore] = [:]
         var order: [String] = []
-        for chunkStart in stride(from: 0, to: allSkus.count, by: 20) {
-            let chunk = Array(allSkus[chunkStart..<min(chunkStart + 20, allSkus.count)])
+        for chunkStart in stride(from: 0, to: allSkus.count, by: Self.partsPerRequest) {
+            let chunk = Array(allSkus[chunkStart..<min(chunkStart + Self.partsPerRequest, allSkus.count)])
             let stores = try await fetchChunk(skus: chunk, location: location, country: country, skuData: skuData, search: search)
             for store in stores {
                 if let existing = merged[store.storeNumber] {

@@ -12,6 +12,7 @@
 		385886AF290827D6003D3C80 /* SKUDataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886AE290827D6003D3C80 /* SKUDataLoader.swift */; };
 		385886B12908280E003D3C80 /* FulfillmentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886B02908280E003D3C80 /* FulfillmentModel.swift */; };
 		38E20B012A6B0001000000D1 /* PushoverClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E20B022A6B0001000000D1 /* PushoverClient.swift */; };
+		38E20C012A6B0001000000E1 /* LaunchHours.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E20C022A6B0001000000E1 /* LaunchHours.swift */; };
 		385886B529082831003D3C80 /* ViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886B429082831003D3C80 /* ViewModel.swift */; };
 		385886B72908283F003D3C80 /* DefaultsVendor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385886B62908283F003D3C80 /* DefaultsVendor.swift */; };
 		386FDC572739DA7300C1BAC2 /* ReadyForPickupApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 386FDC562739DA7300C1BAC2 /* ReadyForPickupApp.swift */; };
@@ -44,6 +45,7 @@
 		385886AE290827D6003D3C80 /* SKUDataLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SKUDataLoader.swift; sourceTree = "<group>"; };
 		385886B02908280E003D3C80 /* FulfillmentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FulfillmentModel.swift; sourceTree = "<group>"; };
 		38E20B022A6B0001000000D1 /* PushoverClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushoverClient.swift; sourceTree = "<group>"; };
+		38E20C022A6B0001000000E1 /* LaunchHours.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchHours.swift; sourceTree = "<group>"; };
 		385886B429082831003D3C80 /* ViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModel.swift; sourceTree = "<group>"; };
 		385886B62908283F003D3C80 /* DefaultsVendor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultsVendor.swift; sourceTree = "<group>"; };
 		386FDC532739DA7300C1BAC2 /* ReadyForPickup.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ReadyForPickup.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -154,6 +156,7 @@
 				385886AE290827D6003D3C80 /* SKUDataLoader.swift */,
 				385886B02908280E003D3C80 /* FulfillmentModel.swift */,
 				38E20B022A6B0001000000D1 /* PushoverClient.swift */,
+				38E20C022A6B0001000000E1 /* LaunchHours.swift */,
 				3895BE93290B101B00FBC188 /* NotificationSender.swift */,
 				3863FF54290D7F550013C1DE /* ModelTypes */,
 			);
@@ -257,6 +260,7 @@
 				385886AF290827D6003D3C80 /* SKUDataLoader.swift in Sources */,
 				385886B12908280E003D3C80 /* FulfillmentModel.swift in Sources */,
 				38E20B012A6B0001000000D1 /* PushoverClient.swift in Sources */,
+				38E20C012A6B0001000000E1 /* LaunchHours.swift in Sources */,
 				38D0C3A2273C60B500A7DE65 /* Countries.swift in Sources */,
 				38E20A012A6B0001000000C1 /* SavedSearch.swift in Sources */,
 				386FDC572739DA7300C1BAC2 /* ReadyForPickupApp.swift in Sources */,

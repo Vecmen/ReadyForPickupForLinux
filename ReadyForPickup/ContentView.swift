@@ -164,8 +164,12 @@ struct ContentView: View {
                         } else {
                             Text("Not yet updated").font(.caption).foregroundColor(.secondary)
                         }
-                        if model.autoRefreshIntervalMinutes > 0, let next = model.nextAutoRefreshAt {
-                            Text("Auto-refresh at \(next.formatted(date: .omitted, time: .shortened))")
+                        // Also with Auto-refresh Off, while launch hours are on.
+                        if let next = model.nextAutoRefreshAt {
+                            let time = next.formatted(date: .omitted, time: .shortened)
+                            Text(model.nextAutoRefreshIsInLaunchHours
+                                 ? "Auto-refresh at \(time) (launch hours)"
+                                 : "Auto-refresh at \(time)")
                                 .font(.caption).foregroundColor(.secondary)
                         }
                     }

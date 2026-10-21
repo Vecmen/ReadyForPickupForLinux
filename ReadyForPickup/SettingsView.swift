@@ -14,6 +14,10 @@ struct SettingsView: View {
     @EnvironmentObject var updater: UpdaterViewModel
     @AppStorage("preferredCountry") private var preferredCountry = "US"
     @AppStorage("preferredUpdateInterval") private var preferredUpdateInterval: Int = 5
+    // Read by LaunchHours.stored.
+    @AppStorage(LaunchHours.enabledKey) private var launchHoursEnabled = false
+    @AppStorage(LaunchHours.startKey) private var launchHoursStart = LaunchHours.defaultStart
+    @AppStorage(LaunchHours.endKey) private var launchHoursEnd = LaunchHours.defaultEnd
     // Read by PushoverSettings.highPriorityAlerts.
     @AppStorage("pushoverHighPriority") private var pushoverHighPriority = false
     @State private var pushoverUserKey: String = PushoverSettings.userKey
@@ -55,6 +59,30 @@ struct SettingsView: View {
             // never refused at 12 an hour.
             if requestsPerHour >= 20 {
                 Text("That's about \(requestsPerHour) requests an hour, one per search per refresh. Apple answers about 31 in an hour and a half, then refuses every device on your network for up to half an hour, so the app will miss stretches. Under 20 an hour, such as one search every 5 minutes, it keeps answering.")
+                    .font(.caption).foregroundColor(.orange)
+            }
+
+            Toggle("Check more often during launch hours", isOn: $launchHoursEnabled)
+                .onChange(of: launchHoursSetting) { _ in
+                    // Takes effect immediately, like the interval above.
+                    model.restartAutoRefresh()
+                }
+            Group {
+                DatePicker("From", selection: timeOfDay($launchHoursStart), displayedComponents: .hourAndMinute)
+                DatePicker("To", selection: timeOfDay($launchHoursEnd), displayedComponents: .hourAndMinute)
+            }
+            .environment(\.timeZone, Self.utc)
+            .disabled(launchHoursEnabled == false)
+            Text(launchHoursCaption)
+                .font(.caption).foregroundColor(.secondary)
+                // Always 7 lines while on, the longest caption at 420 pt.
+                // Settings keeps its height, so when this wrapped to a line
+                // more or less, the caption above shrank or grew and the
+                // pickers moved under the pointer as From or To changed.
+                .lineLimit(7, reservesSpace: launchHoursEnabled)
+                .fixedSize(horizontal: false, vertical: true)
+            if launchHoursEnabled, let warning = launchHoursWarning {
+                Text(warning)
                     .font(.caption).foregroundColor(.orange)
             }
 
@@ -143,7 +171,69 @@ struct SettingsView: View {
     /// Auto-refresh's pickup requests an hour: one per search per refresh
     /// (two for a search watching more than 20 models).
     private var requestsPerHour: Int {
-        preferredUpdateInterval > 0 ? model.searches.count * 60 / preferredUpdateInterval : 0
+        preferredUpdateInterval > 0 ? model.requestsPerSweep * 60 / preferredUpdateInterval : 0
+    }
+
+    private var launchHoursSetting: LaunchHours {
+        LaunchHours(isEnabled: launchHoursEnabled, start: launchHoursStart, end: launchHoursEnd)
+    }
+
+    private var launchHoursCaption: String {
+        let hours = launchHoursSetting
+        guard hours.isEnabled else {
+            return "Turn this on to refresh searches more often in a daily window, such as the hours stock drops at a launch."
+        }
+        guard hours.minutes > 0 else {
+            return "From and To are the same time, so launch hours never start."
+        }
+        let requests = model.requestsPerSweep
+        let interval = hours.intervalMinutes(requestsPerSweep: requests, autoRefreshMinutes: preferredUpdateInterval)
+        let end = time(hours.end) + (hours.end < hours.start ? " the next day" : "")
+        var caption = "Every day from \(time(hours.start)) to \(end), searches refresh every \(interval) minutes: as often as keeps the app to \(LaunchHours.requestBudget) requests in any hour and a half (Apple answers about \(LaunchHours.requestsAppleAnswers)), counting Auto-refresh's outside the window. At other times they follow Auto-refresh above, which can be Off."
+        // What would make launch hours refresh more often.
+        var hour = hours
+        hour.end = (hours.start + 60) % (24 * 60)
+        let withoutAutoRefresh = hours.intervalMinutes(requestsPerSweep: requests, autoRefreshMinutes: 0)
+        let hourLong = hour.intervalMinutes(requestsPerSweep: requests, autoRefreshMinutes: preferredUpdateInterval)
+        if preferredUpdateInterval > 0, withoutAutoRefresh < interval {
+            caption += " With Auto-refresh Off they'd refresh every \(withoutAutoRefresh) minutes."
+        } else if hours.minutes > 60, hourLong < interval {
+            caption += " An hour-long window would refresh every \(hourLong) minutes."
+        }
+        return caption
+    }
+
+    /// Shown when Auto-refresh by itself sends more than requestBudget in
+    /// an hour and a half: launch hours can't keep the app under it then.
+    private var launchHoursWarning: String? {
+        guard launchHoursSetting.minutes > 0, preferredUpdateInterval > 0,
+              LaunchHours.keepsToBudget(requestsPerSweep: model.requestsPerSweep, everyMinutes: preferredUpdateInterval) == false
+        else { return nil }
+        return "Auto-refresh above sends more than Apple answers, so the app may be refused during launch hours too. Set it to refresh less often, or Off."
+    }
+
+    // Launch hours' times are minutes after midnight on the Mac's clock,
+    // not dates. The pickers show them as that time on 2001-01-01 in UTC,
+    // which never skips or repeats an hour, so any time can be picked and
+    // reads back as picked.
+    private static let utc = TimeZone(secondsFromGMT: 0)!
+    private static let utcCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = utc
+        return calendar
+    }()
+
+    private func timeOfDay(_ minutes: Binding<Int>) -> Binding<Date> {
+        Binding(get: { Date(timeIntervalSinceReferenceDate: TimeInterval(minutes.wrappedValue * 60)) },
+                set: { date in
+                    let parts = Self.utcCalendar.dateComponents([.hour, .minute], from: date)
+                    minutes.wrappedValue = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+                })
+    }
+
+    private func time(_ minutes: Int) -> String {
+        Date(timeIntervalSinceReferenceDate: TimeInterval(minutes * 60))
+            .formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: Self.utc))
     }
 
     private var macNotificationsCaption: String {

@@ -34,6 +34,9 @@ final class ViewModel: ObservableObject {
     @Published var autoRefreshIntervalMinutes: Int = 5
     @Published var nextAutoRefreshAt: Date?
     @Published var throttledUntil: Date?
+    /// Settings > Auto-refresh's launch hours. Re-read by
+    /// restartAutoRefresh, which Settings calls on every change.
+    private(set) var launchHours = LaunchHours.stored
 
     @Published var pushoverEnabled: Bool = PushoverSettings.isEnabled
     @Published var pushoverConfigured: Bool = PushoverSettings.isConfigured
@@ -104,6 +107,17 @@ final class ViewModel: ObservableObject {
 
     func availableCount(for search: SavedSearch) -> Int {
         (results[search.id] ?? []).reduce(0) { $0 + $1.1.count }
+    }
+
+    /// Pickup requests a refresh of every search sends.
+    var requestsPerSweep: Int {
+        searches.reduce(0) { $0 + FulfillmentModel.requestCount(for: $1) }
+    }
+
+    /// Whether the refresh at nextAutoRefreshAt comes during launch hours.
+    var nextAutoRefreshIsInLaunchHours: Bool {
+        guard let nextAutoRefreshAt else { return false }
+        return launchHours.window(containing: nextAutoRefreshAt) != nil
     }
 
     /// Any fetch in flight (toolbar spinner).
@@ -315,34 +329,78 @@ final class ViewModel: ObservableObject {
 
     // MARK: - Auto-refresh scheduler
 
-    /// (Re)starts the Task.sleep-based scheduler. Idempotent: any
-    /// previous loop is cancelled first, so settings changes and manual
-    /// refreshes never stack timers; a sweep already running carries on.
-    /// Changing the interval or turning it Off takes effect immediately,
-    /// without relaunch.
+    /// (Re)starts the scheduler. Idempotent: any previous loop is
+    /// cancelled first, so settings changes and manual refreshes never
+    /// stack timers; a sweep already running carries on. Changing the
+    /// interval or launch hours, or turning either off, takes effect
+    /// immediately, without relaunch.
     func restartAutoRefresh(withMinutes minutes: Int? = nil) {
         if let minutes {
             autoRefreshIntervalMinutes = Self.allowedIntervals.contains(minutes) ? minutes : 5
             UserDefaults.standard.set(autoRefreshIntervalMinutes, forKey: "preferredUpdateInterval")
         }
+        launchHours = LaunchHours.stored
 
         autoRefreshTask?.cancel()
         autoRefreshTask = nil
         nextAutoRefreshAt = nil
 
-        guard autoRefreshIntervalMinutes > 0 else { return }
+        // With Auto-refresh Off, launch hours still start it when they open.
+        guard autoRefreshIntervalMinutes > 0 || launchHours.isActive else { return }
 
         autoRefreshTask = Task { [weak self] in
+            // Counts from now: a manual refresh or a settings change starts
+            // the schedule over.
+            var lastRefresh = Date()
+            var wokeLate = false
             while Task.isCancelled == false {
                 guard let self else { return }
-                let delay = self.currentAutoRefreshDelay()
-                self.nextAutoRefreshAt = Date().addingTimeInterval(delay)
-                logger.debug("Next auto-refresh in \(Int(delay))s")
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                if Task.isCancelled { return }
-                await self.sweep()
+                let now = Date()
+                guard var next = self.nextAutoRefresh(after: lastRefresh, now: now) else {
+                    self.nextAutoRefreshAt = nil
+                    return
+                }
+                // The last step ended well past its time, so the Mac was
+                // asleep: give its network a few seconds to come back.
+                if wokeLate {
+                    next = max(next, now.addingTimeInterval(10))
+                }
+                if next <= now {
+                    await self.sweep()
+                    lastRefresh = Date()
+                    continue
+                }
+                if self.nextAutoRefreshAt != next {
+                    self.nextAutoRefreshAt = next
+                    logger.debug("Next auto-refresh in \(Int(next.timeIntervalSince(now)))s")
+                }
+                // Waits in steps of at most a minute on the continuous
+                // clock, which keeps counting while the Mac sleeps (unlike
+                // Task.sleep(nanoseconds:)), then reads the Mac's clock
+                // again. So a refresh that came due during sleep, such as
+                // launch hours opening, comes as the Mac wakes, and a clock
+                // or time zone change counts within a minute.
+                let stepEnd = ContinuousClock.now + .seconds(min(next.timeIntervalSince(now), 60))
+                try? await Task.sleep(until: stepEnd, tolerance: .seconds(1), clock: .continuous)
+                wokeLate = ContinuousClock.now - stepEnd > .seconds(5)
             }
         }
+    }
+
+    /// When auto-refresh refreshes next after the refresh at `last`: no
+    /// sooner than `now`, and while Apple is throttling, no sooner than
+    /// throttledUntil (the backoff wins over any interval).
+    private func nextAutoRefresh(after last: Date, now: Date) -> Date? {
+        schedule.nextRefresh(after: last, notBefore: max(now, throttledUntil ?? now))
+    }
+
+    /// Auto-refresh's intervals: launch hours' while the window is open,
+    /// the Auto-refresh setting's otherwise.
+    private var schedule: AutoRefreshSchedule {
+        let launchHoursMinutes = launchHours.intervalMinutes(requestsPerSweep: requestsPerSweep,
+                                                             autoRefreshMinutes: autoRefreshIntervalMinutes)
+        return AutoRefreshSchedule(autoRefreshMinutes: autoRefreshIntervalMinutes, launchHours: launchHours,
+                                   launchHoursMinutes: launchHoursMinutes)
     }
 
     /// Re-reads Pushover config after Settings edits.
@@ -422,22 +480,15 @@ final class ViewModel: ObservableObject {
         macNotificationFeedback = "Test sent. No banner? Check Focus, and note that macOS hides banners while the screen is shared or mirrored; it's still in Notification Center."
     }
 
-    /// The refresh interval, or longer while Apple is throttling.
-    private func currentAutoRefreshDelay() -> TimeInterval {
-        var delay = TimeInterval(autoRefreshIntervalMinutes * 60)
-        if let throttledUntil {
-            delay = max(delay, throttledUntil.timeIntervalSinceNow)
-        }
-        return delay
-    }
-
     /// Counts one throttled cycle (a sweep, or a single-search refresh)
-    /// and holds auto-refresh back until `throttledUntil`: the interval
-    /// (at least 5 min, also when auto-refresh is Off) doubles per
-    /// consecutive throttled cycle, capped at 60 min.
+    /// and holds auto-refresh back until `throttledUntil`: the interval at
+    /// the time (launch hours' while they're open; at least 5 min, also
+    /// when auto-refresh is Off) doubles per consecutive throttled cycle,
+    /// capped at 60 min.
     private func registerThrottle(statusCode: Int, searchID: UUID) {
         throttleFailureCount += 1
-        let base = TimeInterval(max(autoRefreshIntervalMinutes, 5) * 60)
+        let schedule = self.schedule
+        let base = TimeInterval(max(schedule.intervalMinutes(at: Date()), 5) * 60)
         let backoff = min(3600, base * pow(2.0, Double(min(throttleFailureCount, 4))))
         let retryAt = Date().addingTimeInterval(backoff)
         throttledUntil = retryAt
@@ -445,7 +496,9 @@ final class ViewModel: ObservableObject {
         guard searches.contains(where: { $0.id == searchID }) else { return }
         let mins = Int((backoff / 60).rounded(.up))
         let time = retryAt.formatted(date: .omitted, time: .shortened)
-        searchErrors[searchID] = autoRefreshIntervalMinutes > 0
+        // Auto-refresh retries at retryAt if it's on at that time, by its
+        // setting or by launch hours.
+        searchErrors[searchID] = schedule.intervalMinutes(at: retryAt) > 0
             ? "Apple is throttling requests (HTTP \(statusCode)); retrying in ~\(mins) min (next retry at \(time))."
             : "Apple is throttling requests (HTTP \(statusCode)). Auto-refresh is off: wait ~\(mins) min (until \(time)) before refreshing."
     }
