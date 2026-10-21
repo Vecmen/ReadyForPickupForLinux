@@ -50,6 +50,12 @@ struct SettingsView: View {
             }
             Text("Searches refresh automatically, one after another, while the app is running - even with its window closed. To re-check now, use the toolbar refresh button or File > Refresh Selected Search (Cmd-R), or File > Refresh All Searches (Shift-Cmd-R); either also resets the schedule. If Apple starts refusing requests, the app waits longer between refreshes, up to an hour, until Apple answers again.")
                 .font(.caption).foregroundColor(.secondary)
+            // In 2026-10 Apple refused this Mac after about 45 requests in
+            // 45 minutes (Scripts/probe-throttle.py); 12 an hour ran for days.
+            if requestsPerHour >= 30 {
+                Text("At this rate the app sends about \(requestsPerHour) requests an hour, one per search per refresh. Apple stops answering a network for about half an hour once it has sent roughly 40-60 within an hour or two, from all its Macs and iPhones together, so the app will likely be refused. Keep it for a short stretch, such as a launch.")
+                    .font(.caption).foregroundColor(.orange)
+            }
 
             Divider()
 
@@ -131,6 +137,12 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await model.refreshMacNotificationStatus() }
         }
+    }
+
+    /// Auto-refresh's pickup requests an hour: one per search per refresh
+    /// (two for a search watching more than 20 models).
+    private var requestsPerHour: Int {
+        preferredUpdateInterval > 0 ? model.searches.count * 60 / preferredUpdateInterval : 0
     }
 
     private var macNotificationsCaption: String {
