@@ -50,10 +50,11 @@ struct SettingsView: View {
             }
             Text("Searches refresh automatically, one after another, while the app is running - even with its window closed. To re-check now, use the toolbar refresh button or File > Refresh Selected Search (Cmd-R), or File > Refresh All Searches (Shift-Cmd-R); either also resets the schedule. If Apple starts refusing requests, the app waits longer between refreshes, up to an hour, until Apple answers again.")
                 .font(.caption).foregroundColor(.secondary)
-            // In 2026-10 Apple refused this Mac after about 45 requests in
-            // 45 minutes (Scripts/probe-throttle.py); 12 an hour ran for days.
-            if requestsPerHour >= 30 {
-                Text("At this rate the app sends about \(requestsPerHour) requests an hour, one per search per refresh. Apple stops answering a network for about half an hour once it has sent roughly 40-60 within an hour or two, from all its Macs and iPhones together, so the app will likely be refused. Keep it for a short stretch, such as a launch.")
+            // On 2026-10-21 the app alone, every 2 minutes, got 31 answers
+            // and then 20-30 minutes of refusals, four times in a row; it was
+            // never refused at 12 an hour.
+            if requestsPerHour >= 20 {
+                Text("That's about \(requestsPerHour) requests an hour, one per search per refresh. Apple answers about 31 in an hour and a half, then refuses every device on your network for up to half an hour, so the app will miss stretches. Under 20 an hour, such as one search every 5 minutes, it keeps answering.")
                     .font(.caption).foregroundColor(.orange)
             }
 

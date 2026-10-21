@@ -11,9 +11,15 @@ throttles) or block page, after --hours, or after 5 failed refreshes in a
 row. The connection itself is Python's (HTTP/1.1, OpenSSL), not the app's
 URLSession, so Apple's bot detection may still tell the two apart.
 
-The requests go out from this Mac's address and count against the same limit
-as ReadyForPickup running here and the iPhone app on the same network: a
-block pauses those too, for about half an hour.
+The requests go out from this Mac's address, and a block stops every client
+on the network, ReadyForPickup and the iPhone app included, for up to half an
+hour. Apple seems to count this script's calls apart from the app's, though:
+on 2026-10-21 both were refused when the app had made its own 31st call in
+about 94 minutes, with 22 of the probe's calls in between, and the app alone
+every 2 minutes got 31 answers before each of four later blocks. To measure
+the app itself, read its log, where CFNetwork records every response status:
+    /usr/bin/log show --style compact --last 6h --predicate \
+        'process == "ReadyForPickup" AND eventMessage CONTAINS "received response, status"'
 
 Usage (Python 3.9+, standard library only):
     Scripts/probe-throttle.py --dry-run           # print the requests, send nothing

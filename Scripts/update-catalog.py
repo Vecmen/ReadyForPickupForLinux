@@ -59,14 +59,13 @@ Where the data comes from:
   title check fails, or nothing verifies.
 
 Usage (Python 3.9+, standard library only). Apple's pickup API answers HTTP
-541 for about half an hour once one address has sent roughly 40-60 calls,
-however they are spaced. In 2026-10 that happened at 30 and 100 seconds per
-call, and after 44 calls in 46 minutes from two clients calling every 2
-minutes each (Scripts/probe-throttle.py and ReadyForPickup, refused 90
-seconds apart). ReadyForPickup's own calls count, so turn its auto-refresh
-off first. Each country needs about 10 pickup calls plus 7 page loads, so
-refresh a few countries per run, about an hour apart, all with one new
---cache-dir per refresh:
+541 for up to half an hour once this script has sent roughly 40-60 calls (in
+2026-10 that happened at 30 and 100 seconds per call alike). ReadyForPickup
+itself gets about 31 calls in an hour and a half (2026-10-21, from its own
+log), and a block stops every client on the network, so turn the app's
+auto-refresh off first. Each country needs about 10 pickup calls plus 7 page
+loads, so refresh a few countries per run, about an hour apart, all with one
+new --cache-dir per refresh:
     Scripts/update-catalog.py --only GB,JP,FR,DE --cache-dir ~/rfp-cache/2026-10-19
     Scripts/update-catalog.py --only CH,NL --cache-dir ~/rfp-cache/2026-10-19 --dry-run \
         --report-json /tmp/catalog-report.json
