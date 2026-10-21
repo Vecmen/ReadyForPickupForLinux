@@ -35,10 +35,11 @@ Usage (Python 3.9+, standard library only):
                                               # reuse saved responses
 
 The paced Apple client below (AppleClient) is shared with
-Scripts/update-catalog.py: one request at a time, at least 3.5 seconds
-apart, a desktop Safari User-Agent, and on HTTP 429/541/503 or a block page
-it waits 60 seconds, then 5 minutes, then gives up; after a throttled
-response it also leaves twice the gap between later requests.
+Scripts/update-catalog.py and Scripts/probe-throttle.py: one request at a
+time, at least 3.5 seconds apart, a desktop Safari User-Agent, and on HTTP
+429/541/503 or a block page it waits 60 seconds, then 5 minutes, then gives
+up; after a throttled response it also leaves twice the gap between later
+requests.
 """
 
 from __future__ import annotations
@@ -126,10 +127,11 @@ class AppleClient:
     oldest one served.
     After a throttled response every later gap is doubled (up to 4x), and
     `max_requests` stops the run before it sends more than that many.
+    `headers` replaces or adds request headers.
     """
 
     def __init__(self, cache_dir: Path | None = None, interval: float = MIN_INTERVAL,
-                 max_requests: int | None = None, log=sys.stderr):
+                 max_requests: int | None = None, log=sys.stderr, headers: dict | None = None):
         self.cache_dir = Path(cache_dir) if cache_dir else None
         if self.cache_dir:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -137,6 +139,7 @@ class AppleClient:
         self.max_requests = max_requests
         self.slowdown = 1.0
         self.log = log
+        self.headers = dict(headers or {})
         self.requests = 0
         self.cache_hits = 0
         self.oldest_cached = None
@@ -154,6 +157,13 @@ class AppleClient:
                 return resp
             url = urllib.parse.urljoin(url, location)
         raise AppleError(f"too many redirects for {url}")
+
+    def fetch(self, url: str, referer: str | None = None, expect_json: bool = False,
+              min_interval: float = 0.0) -> Response:
+        """One paced request, answered as Apple sent it: never cached,
+        redirected or retried, also when throttled."""
+        status, headers, body = self._fetch(url, referer, expect_json, min_interval)
+        return Response(url, status, headers, body)
 
     def _get_once(self, url: str, referer: str | None, expect_json: bool, min_interval: float) -> Response:
         host = urllib.parse.urlsplit(url).hostname
@@ -201,6 +211,7 @@ class AppleClient:
         }
         if referer:
             headers["Referer"] = referer
+        headers.update(self.headers)
         request = urllib.request.Request(url, headers=headers)
         self.requests += 1
         try:
