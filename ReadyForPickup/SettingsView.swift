@@ -14,6 +14,10 @@ struct SettingsView: View {
     @EnvironmentObject var updater: UpdaterViewModel
     @AppStorage("preferredCountry") private var preferredCountry = "US"
     @AppStorage("preferredUpdateInterval") private var preferredUpdateInterval: Int = 5
+    // Read by LaunchHours.stored.
+    @AppStorage(LaunchHours.enabledKey) private var launchHoursEnabled = false
+    @AppStorage(LaunchHours.startKey) private var launchHoursStart = LaunchHours.defaultStart
+    @AppStorage(LaunchHours.endKey) private var launchHoursEnd = LaunchHours.defaultEnd
     // Read by PushoverSettings.highPriorityAlerts.
     @AppStorage("pushoverHighPriority") private var pushoverHighPriority = false
     @State private var pushoverUserKey: String = PushoverSettings.userKey
@@ -55,6 +59,24 @@ struct SettingsView: View {
             // never refused at 12 an hour.
             if requestsPerHour >= 20 {
                 Text("That's about \(requestsPerHour) requests an hour, one per search per refresh. Apple answers about 31 in an hour and a half, then refuses every device on your network for up to half an hour, so the app will miss stretches. Under 20 an hour, such as one search every 5 minutes, it keeps answering.")
+                    .font(.caption).foregroundColor(.orange)
+            }
+
+            Toggle("Check more often during launch hours", isOn: $launchHoursEnabled)
+                .onChange(of: launchHoursSetting) { _ in
+                    // Takes effect immediately, like the interval above.
+                    model.restartAutoRefresh()
+                }
+            Group {
+                DatePicker("From", selection: timeOfDay($launchHoursStart), displayedComponents: .hourAndMinute)
+                DatePicker("To", selection: timeOfDay($launchHoursEnd), displayedComponents: .hourAndMinute)
+            }
+            .environment(\.timeZone, Self.utc)
+            .disabled(launchHoursEnabled == false)
+            Text(launchHoursCaption)
+                .font(.caption).foregroundColor(.secondary)
+            if launchHoursEnabled, let warning = launchHoursWarning {
+                Text(warning)
                     .font(.caption).foregroundColor(.orange)
             }
 
@@ -143,7 +165,61 @@ struct SettingsView: View {
     /// Auto-refresh's pickup requests an hour: one per search per refresh
     /// (two for a search watching more than 20 models).
     private var requestsPerHour: Int {
-        preferredUpdateInterval > 0 ? model.searches.count * 60 / preferredUpdateInterval : 0
+        preferredUpdateInterval > 0 ? model.requestsPerSweep * 60 / preferredUpdateInterval : 0
+    }
+
+    private var launchHoursSetting: LaunchHours {
+        LaunchHours(isEnabled: launchHoursEnabled, start: launchHoursStart, end: launchHoursEnd)
+    }
+
+    private var launchHoursCaption: String {
+        let hours = launchHoursSetting
+        let interval = LaunchHours.intervalMinutes(requestsPerSweep: model.requestsPerSweep)
+        let pace = "as often as the app can while sending at most \(LaunchHours.maxRequestsPerHour) requests an hour, one per search per refresh"
+        guard hours.isEnabled else {
+            return "Turn this on to refresh searches every \(interval) minutes in a daily window, such as the hours stock drops at a launch: \(pace)."
+        }
+        guard hours.minutes > 0 else {
+            return "From and To are the same time, so launch hours never start."
+        }
+        let end = time(hours.end) + (hours.end < hours.start ? " the next day" : "")
+        var caption = "Every day from \(time(hours.start)) to \(end), searches refresh every \(interval) minutes: \(pace). At other times they follow Auto-refresh above, which can be Off."
+        if preferredUpdateInterval > 0, preferredUpdateInterval < interval {
+            caption += " That's slower than Auto-refresh above, which Apple will refuse at times."
+        }
+        return caption
+    }
+
+    /// Shown when one day's window would send more than Apple answers
+    /// before refusing (LaunchHours.requestsAppleAnswers).
+    private var launchHoursWarning: String? {
+        let requests = launchHoursSetting.requestsPerWindow(requestsPerSweep: model.requestsPerSweep)
+        guard requests >= LaunchHours.requestsAppleAnswers else { return nil }
+        return "This window sends up to \(requests) requests. Apple answers about \(LaunchHours.requestsAppleAnswers) in an hour and a half, then refuses every device on your network for up to half an hour, so the app may be refused before the window ends. A shorter window avoids that."
+    }
+
+    // Launch hours' times are minutes after midnight on the Mac's clock,
+    // not dates. The pickers show them as that time on 2001-01-01 in UTC,
+    // which never skips or repeats an hour, so any time can be picked and
+    // reads back as picked.
+    private static let utc = TimeZone(secondsFromGMT: 0)!
+    private static let utcCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = utc
+        return calendar
+    }()
+
+    private func timeOfDay(_ minutes: Binding<Int>) -> Binding<Date> {
+        Binding(get: { Date(timeIntervalSinceReferenceDate: TimeInterval(minutes.wrappedValue * 60)) },
+                set: { date in
+                    let parts = Self.utcCalendar.dateComponents([.hour, .minute], from: date)
+                    minutes.wrappedValue = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+                })
+    }
+
+    private func time(_ minutes: Int) -> String {
+        Date(timeIntervalSinceReferenceDate: TimeInterval(minutes * 60))
+            .formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: Self.utc))
     }
 
     private var macNotificationsCaption: String {
