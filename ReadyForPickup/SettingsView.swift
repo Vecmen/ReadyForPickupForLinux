@@ -270,9 +270,14 @@ struct SettingsView: View {
 
 private extension View {
     /// A setting's caption, shown in full. Without fixedSize, Settings made
-    /// its window too short and cut captions off after one line.
+    /// its window too short and cut captions off after one line. It takes
+    /// the column's whole width: the Form centers its columns on their
+    /// widest row, so a caption's longest line changing as its text did
+    /// moved every control sideways.
     func caption(_ color: Color = .secondary) -> some View {
-        font(.caption).foregroundColor(color).fixedSize(horizontal: false, vertical: true)
+        font(.caption).foregroundColor(color)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// One tab of Settings: 420 pt wide and as tall as its settings. The
