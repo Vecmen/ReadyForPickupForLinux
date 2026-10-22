@@ -7,8 +7,9 @@ import Foundation
 
 /// One saved search in the 2.0-style UI: a product at a store in one
 /// country, with its own preferred models, nearby-store preference,
-/// custom SKU and local-notification preference. Multiple searches are
-/// persisted as Codable JSON in UserDefaults (key "savedSearches").
+/// custom SKU and local-notification preference. A paused search is
+/// kept but never checked, so it sends no requests and no notifications.
+/// Multiple searches are persisted as Codable JSON in UserDefaults (key "savedSearches").
 struct SavedSearch: Codable, Identifiable, Equatable {
     var id: UUID
     var productTypeRaw: String
@@ -24,6 +25,7 @@ struct SavedSearch: Codable, Identifiable, Equatable {
     var notifyViaPushover: Bool
     var customSku: String
     var customSkuNickname: String
+    var isPaused: Bool
 
     init(id: UUID = UUID(),
          productType: ProductType,
@@ -36,7 +38,8 @@ struct SavedSearch: Codable, Identifiable, Equatable {
          notifyOnThisMac: Bool = true,
          notifyViaPushover: Bool = true,
          customSku: String = "",
-         customSkuNickname: String = "") {
+         customSkuNickname: String = "",
+         isPaused: Bool = false) {
         self.id = id
         self.productTypeRaw = productType.rawValue
         self.countryCode = countryCode
@@ -49,12 +52,13 @@ struct SavedSearch: Codable, Identifiable, Equatable {
         self.notifyViaPushover = notifyViaPushover
         self.customSku = customSku
         self.customSkuNickname = customSkuNickname
+        self.isPaused = isPaused
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, productTypeRaw, countryCode, storeNumber, storeName, includeNearby
         case preferredSKUs, onlyPreferred, notifyOnThisMac, notifyViaPushover
-        case customSku, customSkuNickname
+        case customSku, customSkuNickname, isPaused
     }
 
     init(from decoder: Decoder) throws {
@@ -77,6 +81,7 @@ struct SavedSearch: Codable, Identifiable, Equatable {
         notifyViaPushover = try c.decodeIfPresent(Bool.self, forKey: .notifyViaPushover) ?? true
         customSku = try c.decodeIfPresent(String.self, forKey: .customSku) ?? ""
         customSkuNickname = try c.decodeIfPresent(String.self, forKey: .customSkuNickname) ?? ""
+        isPaused = try c.decodeIfPresent(Bool.self, forKey: .isPaused) ?? false
     }
 
     /// Falls back to a current product if the saved type was retired.

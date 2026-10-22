@@ -32,6 +32,7 @@ struct ReadyForPickupApp: App {
                     Task { await model.fetchSelected() }
                 }
                 .keyboardShortcut("r", modifiers: .command)
+                .disabled(model.selectedSearch?.isPaused == true)
                 Button("Refresh All Searches") {
                     Task { await model.fetchAllSearches() }
                 }

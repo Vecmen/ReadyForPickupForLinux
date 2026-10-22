@@ -109,9 +109,10 @@ final class ViewModel: ObservableObject {
         (results[search.id] ?? []).reduce(0) { $0 + $1.1.count }
     }
 
-    /// Pickup requests a refresh of every search sends.
+    /// Pickup requests a refresh of every search sends (none for a
+    /// paused one).
     var requestsPerSweep: Int {
-        searches.reduce(0) { $0 + FulfillmentModel.requestCount(for: $1) }
+        searches.filter { $0.isPaused == false }.reduce(0) { $0 + FulfillmentModel.requestCount(for: $1) }
     }
 
     /// Whether the refresh at nextAutoRefreshAt comes during launch hours.
@@ -252,6 +253,18 @@ final class ViewModel: ObservableObject {
         SearchStore.save(searches)
     }
 
+    /// Pauses or resumes a search. A paused search keeps its last results
+    /// but isn't checked, by auto-refresh or by hand, and sends no
+    /// notifications. Resuming refreshes it.
+    func setPaused(_ paused: Bool, ofSearch id: UUID) {
+        guard let idx = searches.firstIndex(where: { $0.id == id }), searches[idx].isPaused != paused else { return }
+        searches[idx].isPaused = paused
+        SearchStore.save(searches)
+        if paused == false {
+            Task { await refreshSearch(id: id) }
+        }
+    }
+
     func updateSelected(_ mutate: (inout SavedSearch) -> Void) {
         guard let id = selectedSearch?.id, let idx = searches.firstIndex(where: { $0.id == id }) else { return }
         mutate(&searches[idx])
@@ -277,9 +290,10 @@ final class ViewModel: ObservableObject {
     }
 
     /// Manual refresh of one search (toolbar, Retry, sidebar menu). Like
-    /// any manual refresh, it reschedules auto-refresh.
+    /// any manual refresh, it reschedules auto-refresh. A paused search
+    /// isn't refreshed.
     func refreshSearch(id: UUID) async {
-        guard let search = searches.first(where: { $0.id == id }) else { return }
+        guard let search = searches.first(where: { $0.id == id }), search.isPaused == false else { return }
         if let statusCode = await fetch(search: search) {
             registerThrottle(statusCode: statusCode, searchID: id)
         }
@@ -309,15 +323,20 @@ final class ViewModel: ObservableObject {
     }
 
     /// Sequential by design (no parallel bursts against Apple's API),
-    /// with a small stagger between searches. A throttled response ends
-    /// the sweep; a sweep that finishes unthrottled clears the backoff.
+    /// with a small stagger between searches. Paused searches are
+    /// skipped. A throttled response ends the sweep; a sweep that finishes
+    /// unthrottled clears the backoff.
     private func fetchAllSequentially() async {
-        for (index, id) in searches.map(\.id).enumerated() {
+        let ids = searches.filter { $0.isPaused == false }.map(\.id)
+        // With every search paused nothing is sent, so nothing shows
+        // Apple has stopped throttling.
+        guard ids.isEmpty == false else { return }
+        for (index, id) in ids.enumerated() {
             if index > 0 {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
-            // Read it now: searches can be edited or deleted mid-sweep.
-            guard let search = searches.first(where: { $0.id == id }) else { continue }
+            // Read it now: searches can be edited, paused or deleted mid-sweep.
+            guard let search = searches.first(where: { $0.id == id }), search.isPaused == false else { continue }
             if let statusCode = await fetch(search: search) {
                 registerThrottle(statusCode: statusCode, searchID: id)
                 return
@@ -518,7 +537,10 @@ final class ViewModel: ObservableObject {
             results[search.id] = parts
             lastUpdated[search.id] = Date()
             searchErrors[search.id] = nil
-            notifyIfNeeded(search: current, parts: parts)
+            // Paused while this fetch was in flight: shown, but no alerts.
+            if current.isPaused == false {
+                notifyIfNeeded(search: current, parts: parts)
+            }
             return nil
         } catch {
             // URLSession throws URLError(.cancelled) when the calling task
