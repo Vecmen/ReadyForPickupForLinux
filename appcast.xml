@@ -3,6 +3,14 @@
     <channel>
         <title>ReadyForPickup</title>
         <item>
+            <title>0.3.8</title>
+            <pubDate>Thu, 22 Oct 2026 15:02:48 -0400</pubDate>
+            <sparkle:version>0.3.8</sparkle:version>
+            <sparkle:shortVersionString>0.3.8</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/wehbs/ReadyForPickup/releases/download/v0.3.8/ReadyForPickup-0.3.8.dmg" length="2616717" type="application/octet-stream" sparkle:edSignature="tkN+wJ/EAmSuFA+KOeVcuNQlBZVOsFBXn97/QRF1zB+N34a70wrpBzC/1tgA3WGcmnyunxVvYzSjRKPoS+xtCw=="/>
+        </item>
+        <item>
             <title>0.3.7</title>
             <pubDate>Wed, 21 Oct 2026 11:26:16 -0400</pubDate>
             <sparkle:version>0.3.7</sparkle:version>
@@ -17,14 +25,6 @@
             <sparkle:shortVersionString>0.3.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/wehbs/ReadyForPickup/releases/download/v0.3.6/ReadyForPickup-0.3.6.dmg" length="2523021" type="application/octet-stream" sparkle:edSignature="SBPGsTfxs6jn77Jh9KvJABkCZZLTNiG1HNsYw1YLwraRJYPtukW5JWSxE/lAMdAJiPC/cz+xAVxn75P2v3X+Dg=="/>
-        </item>
-        <item>
-            <title>0.3.5</title>
-            <pubDate>Mon, 19 Oct 2026 22:23:25 -0400</pubDate>
-            <sparkle:version>0.3.5</sparkle:version>
-            <sparkle:shortVersionString>0.3.5</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/wehbs/ReadyForPickup/releases/download/v0.3.5/ReadyForPickup-0.3.5.dmg" length="2502029" type="application/octet-stream" sparkle:edSignature="qckL7aou1RquB30lnq/EXx2ifOa4js2x+3agofACJ+5Sa5OV8pnN10X2raMxB7zW48TwVqBWLRCNMtC90nSrBw=="/>
         </item>
     </channel>
 </rss>
