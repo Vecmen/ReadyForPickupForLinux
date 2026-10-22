@@ -30,6 +30,13 @@ struct ContentView: View {
                 // No shortcut here: Cmd-R is File > Refresh Selected Search.
                 Button { Task { await model.fetchSelected() } } label: { Image(systemName: "arrow.clockwise") }
                     .help("Refresh selected search (Cmd-R)")
+                    .disabled(model.selectedSearch?.isPaused == true)
+                let paused = model.selectedSearch?.isPaused == true
+                Button { if let id = model.selectedSearch?.id { model.setPaused(paused == false, ofSearch: id) } } label: {
+                    Image(systemName: paused ? "play" : "pause")
+                }
+                .help(paused ? "Resume selected search" : "Pause selected search")
+                .disabled(model.selectedSearch == nil)
                 Button(role: .destructive) { searchPendingDeletion = model.selectedSearch } label: { Image(systemName: "trash") }
                     .help("Delete selected search")
                     .disabled(model.selectedSearch == nil)
@@ -81,6 +88,7 @@ struct ContentView: View {
                             .frame(width: 18)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(search.productType.presentableName)
+                                .foregroundColor(search.isPaused ? .secondary : nil)
                                 .lineLimit(1)
                             Text("at \(model.storeName(for: search))")
                                 .font(.caption)
@@ -89,7 +97,12 @@ struct ContentView: View {
                         }
                         Spacer()
                         let count = model.availableCount(for: search)
-                        if count > 0 {
+                        if search.isPaused {
+                            // Its count is from before it was paused.
+                            Image(systemName: "pause.circle")
+                                .foregroundColor(.secondary)
+                                .help("Paused")
+                        } else if count > 0 {
                             Text("\(count)")
                                 .font(.caption.bold())
                                 .padding(.horizontal, 6).padding(.vertical, 2)
@@ -101,6 +114,12 @@ struct ContentView: View {
                     .contextMenu {
                         Button { Task { await model.refreshSearch(id: search.id) } } label: {
                             Label("Refresh Search", systemImage: "arrow.clockwise")
+                        }
+                        .disabled(search.isPaused)
+                        Button { model.setPaused(search.isPaused == false, ofSearch: search.id) } label: {
+                            search.isPaused
+                                ? Label("Resume Search", systemImage: "play")
+                                : Label("Pause Search", systemImage: "pause")
                         }
                         Button(role: .destructive) { searchPendingDeletion = search } label: {
                             Label("Delete Search…", systemImage: "trash")
@@ -165,7 +184,7 @@ struct ContentView: View {
                             Text("Not yet updated").font(.caption).foregroundColor(.secondary)
                         }
                         // Also with Auto-refresh Off, while launch hours are on.
-                        if let next = model.nextAutoRefreshAt {
+                        if search.isPaused == false, let next = model.nextAutoRefreshAt {
                             let time = next.formatted(date: .omitted, time: .shortened)
                             Text(model.nextAutoRefreshIsInLaunchHours
                                  ? "Auto-refresh at \(time) (launch hours)"
@@ -175,7 +194,16 @@ struct ContentView: View {
                     }
                     .padding(.horizontal, 16).padding(.vertical, 10)
 
-                    if let error = model.searchErrors[search.id] {
+                    if search.isPaused {
+                        HStack(spacing: 8) {
+                            Image(systemName: "pause.circle.fill").foregroundColor(.secondary)
+                            Text("This search is paused, so it isn't checked.").font(.callout)
+                            Spacer()
+                            Button("Resume") { model.setPaused(false, ofSearch: search.id) }
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                        .background(Color.secondary.opacity(0.12))
+                    } else if let error = model.searchErrors[search.id] {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange)
                             Text(error).font(.callout)
@@ -191,7 +219,9 @@ struct ContentView: View {
                         VStack(spacing: 8) {
                             Spacer()
                             Image(systemName: "magnifyingglass").font(.largeTitle).foregroundColor(.secondary)
-                            Text(model.isFetching(search) ? "Checking inventory…" : "No models available in-store.")
+                            Text(model.isFetching(search) ? "Checking inventory…"
+                                 : search.isPaused ? "Resume this search to check inventory."
+                                 : "No models available in-store.")
                                 .foregroundColor(.secondary)
                             if model.searchErrors[search.id] == nil && model.isFetching(search) == false {
                                 Text("Available models for this search will appear here, grouped by store.")
@@ -312,14 +342,17 @@ struct ContentView: View {
         let pushoverOn = search.notifyViaPushover && model.pushoverConfigured
         let channels: String = [macOn ? "on this Mac" : nil, pushoverOn ? "via Pushover" : nil]
             .compactMap { $0 }.joined(separator: " and ")
+        let notifying = channels.isEmpty == false && search.isPaused == false
         return HStack(alignment: .top, spacing: 10) {
-            Image(systemName: channels.isEmpty == false ? "checkmark.circle.fill" : "bell.badge")
-                .foregroundColor(channels.isEmpty == false ? .green : .secondary)
+            Image(systemName: search.isPaused ? "pause.circle.fill" : notifying ? "checkmark.circle.fill" : "bell.badge")
+                .foregroundColor(notifying ? .green : .secondary)
                 .font(.title2)
             VStack(alignment: .leading, spacing: 2) {
-                Text(channels.isEmpty == false ? "Search configured successfully" : "Search saved")
+                Text(search.isPaused ? "Search paused" : notifying ? "Search configured successfully" : "Search saved")
                     .font(.headline)
-                Text(channels.isEmpty == false
+                Text(search.isPaused
+                     ? "It isn't checked and sends no notifications until you resume it."
+                     : notifying
                      ? "You will receive notifications \(channels) when preferred models are found."
                      : "Turn on notifications on this Mac or via Pushover to be alerted when preferred models are found.")
                     .font(.caption).foregroundColor(.secondary)
@@ -327,7 +360,7 @@ struct ContentView: View {
             Spacer()
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.green.opacity(channels.isEmpty == false ? 0.10 : 0.04)))
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.green.opacity(notifying ? 0.10 : 0.04)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.15)))
     }
 
