@@ -46,6 +46,7 @@ class Result:
     status: str               # placed | review_ready | handed_off | failed | dry_run
     order_number: str | None = None
     detail: str = ""
+    total: float | None = None
     screenshots: str = ""
 
 
@@ -78,6 +79,9 @@ def parse_total(text: str) -> float | None:
 
 
 def find_browser(configured: str = "") -> str | None:
+    """None means Playwright's bundled Chromium."""
+    if configured == "bundled":
+        return None
     if configured:
         return configured
     return next((p for p in BROWSER_CANDIDATES if Path(p).exists()), None)
@@ -96,7 +100,13 @@ def open_context(pw, settings: Settings, headless: bool | None = None):
     BROWSER_PROFILE.mkdir(parents=True, exist_ok=True)
     kwargs = dict(headless=settings.autobuy.headless if headless is None else headless,
                   viewport={"width": 1280, "height": 900}, locale="en-US",
-                  args=["--disable-blink-features=AutomationControlled"])
+                  args=["--disable-blink-features=AutomationControlled",
+                        # Keep working while the window is covered or the screen is
+                        # locked (a VM left running): Chromium otherwise pauses
+                        # hidden windows' timers and rendering.
+                        "--disable-backgrounding-occluded-windows",
+                        "--disable-renderer-backgrounding",
+                        "--disable-background-timer-throttling"])
     exe = find_browser(settings.autobuy.browser_executable)
     if exe:
         kwargs["executable_path"] = exe
@@ -108,8 +118,11 @@ class CheckoutFlow:
 
     def __init__(self, page, country: data.Country, store_number: str, store_name: str, sku: str,
                  settings: Settings, dry_run: bool, selectors: dict | None = None, shots: Path | None = None,
-                 item_name: str = ""):
+                 item_name: str = "", max_price: float | None = None):
         self.page, self.c = page, country
+        # The most this order may cost: the limits module passes the tightest
+        # of your caps and the budget left; on its own, autobuy.max_price.
+        self.cap = max_price if max_price is not None else settings.autobuy.max_price
         self.item_name = item_name or sku
         self.store_number, self.store_name, self.sku = store_number, store_name, sku
         self.settings, self.ab, self.dry_run = settings, settings.autobuy, dry_run
@@ -235,7 +248,7 @@ class CheckoutFlow:
                                 "or set autobuy.headless to false")
             msg = ("Enter your Apple ID 2FA code in the ReadyForPickup browser window"
                    if creds else "Sign in to your Apple account in the ReadyForPickup browser window")
-            notify.desktop("ReadyForPickup needs you", msg, urgent=True)
+            self._desktop("ReadyForPickup needs you", msg)
             self._pushover("ReadyForPickup needs you", msg)
         # Wait for Apple (or, for 2FA, the user) to finish signing in.
         wait = self.ab.handoff_minutes * 60 if needs_user else 0
@@ -377,14 +390,17 @@ class CheckoutFlow:
         text = self.page.locator("body").inner_text()
         tot = self._find("order_total")
         self.total = parse_total(("Total " + tot.inner_text()) if tot is not None else text) or parse_total(text)
-        cap = self.ab.max_price
+        cap = self.cap
         if cap is not None and (self.total is None or self.total > cap):
-            got = "couldn't read the total" if self.total is None else f"total {self.total:.2f}"
-            return Result("handed_off", detail=f"{got}; your max_price is {cap:.2f}, so it wasn't placed")
+            why = (f"couldn't read the total to check it against your limit of {cap:,.2f}" if self.total is None
+                   else f"total {self.total:,.2f} is over your limit of {cap:,.2f}")
+            return Result("handed_off", detail=f"{why}, so it wasn't placed", total=self.total)
         if self.dry_run:
-            return Result("dry_run", detail=f"reached the final page (total {self.total}); stopped before Place Order")
+            return Result("dry_run", detail=f"reached the final page (total {self.total}); stopped before Place Order",
+                          total=self.total)
         if not self.ab.place_order:
-            return Result("review_ready", detail=f"ready on the final page (total {self.total}); press Place Order")
+            return Result("review_ready", detail=f"ready on the final page (total {self.total}); press Place Order",
+                          total=self.total)
         self._click("place_order")
         try:
             self.page.wait_for_url(re.compile(self.sel["stage_url_patterns"]["thankyou"], re.I), timeout=60000)
@@ -396,7 +412,7 @@ class CheckoutFlow:
     def do_thankyou(self) -> Result:
         self.shot("thankyou")
         m = re.search(self.sel["order_number_pattern"], self.page.locator("body").inner_text())
-        return Result("placed", order_number=m.group(1) if m else None, detail="order placed")
+        return Result("placed", order_number=m.group(1) if m else None, detail="order placed", total=self.total)
 
     def checkout(self) -> Result:
         self._click("bag_checkout")
@@ -440,6 +456,10 @@ class CheckoutFlow:
         self.verify_bag()
         return self.checkout()
 
+    def _desktop(self, title: str, msg: str) -> None:
+        if self.settings.desktop_notifications:
+            notify.desktop(title, msg, urgent=True)
+
     def _pushover(self, title: str, msg: str) -> None:
         if self.settings.pushover_enabled and notify.pushover_configured():
             try:
@@ -464,7 +484,7 @@ def _handoff(flow: CheckoutFlow, minutes: int) -> Result | None:
 
 
 def purchase(search: Search, store_number: str, store_name: str, sku: str, settings: Settings,
-             dry_run: bool = False) -> Result:
+             dry_run: bool = False, max_price: float | None = None) -> Result:
     """Order `sku` for pickup at `store_number`. Never raises: failures come back as a Result."""
     _require_playwright()
     from playwright.sync_api import sync_playwright
@@ -477,7 +497,8 @@ def purchase(search: Search, store_number: str, store_name: str, sku: str, setti
     with sync_playwright() as pw:
         ctx = open_context(pw, settings)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        flow = CheckoutFlow(page, c, store_number, store_name, sku, settings, dry_run, shots=shots, item_name=item)
+        flow = CheckoutFlow(page, c, store_number, store_name, sku, settings, dry_run, shots=shots, item_name=item,
+                            max_price=max_price)
         try:
             result = flow.run()
         except Exception as e:  # StepError or Playwright errors: hand off, don't lose the item
@@ -494,14 +515,14 @@ def purchase(search: Search, store_number: str, store_name: str, sku: str, setti
         }
         t, body = messages[result.status]
         log.info("auto-order %s: %s", result.status, result.detail)
-        notify.desktop(t, body, urgent=True)
+        flow._desktop(t, body)
         flow._pushover(t, body)
 
         if result.status in ("review_ready", "handed_off", "failed") and not settings.autobuy.headless:
             done = _handoff(flow, settings.autobuy.handoff_minutes)
             if done is not None:
                 result = done
-                notify.desktop(f"Order placed: {item}", f"Order {done.order_number or '(see email)'}")
+                flow._desktop(f"Order placed: {item}", f"Order {done.order_number or '(see email)'}")
         ctx.close()
     return result
 

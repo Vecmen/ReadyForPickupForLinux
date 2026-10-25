@@ -50,6 +50,8 @@ class Search:
     # Auto-order: buy the first newly available preferred model.
     auto_buy: bool = False
     auto_buy_nearby: bool = False   # also accept a nearby store, not just `store`
+    max_price: float | None = None  # this search's cap on one order's total
+    max_orders: int | None = 1      # orders this search may place before it pauses
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
 
     @property
@@ -73,12 +75,16 @@ class AutoBuySettings:
     # for you to press Place Order. True = press it automatically.
     place_order: bool = False
     headless: bool = False
-    max_price: float | None = None      # abort if the order total is higher
+    max_price: float | None = None      # abort if one order's total is higher
+    max_orders: int | None = 1          # orders across all searches; None = no limit
+    max_total_spend: float | None = None  # total of all orders' totals; None = no limit
     clear_bag: bool = True               # empty the bag first so only this item is bought
     handoff_minutes: int = 30            # keep the browser open this long for you on review/failure
     step_timeout_seconds: int = 45
     pickup_search_location: str = ""     # ZIP/city for the checkout store search; default: the store's
-    browser_executable: str = ""         # default: /usr/bin/chromium, then Chrome/Brave
+    # Default: /usr/bin/chromium, then Chrome/Brave. "bundled" = Playwright's own Chromium.
+    browser_executable: str = ""
+    session_check_hours: int = 12        # warn if the Apple sign-in has expired (0 = off)
 
 
 @dataclass
@@ -129,6 +135,8 @@ class State:
         self.throttled_until: float = raw.get("throttled_until", 0.0)
         self.orders: list[dict] = raw.get("orders", [])
         self.autobuy_attempts: dict[str, list[str]] = raw.get("autobuy_attempts", {})
+        self.last_session_check: float = raw.get("last_session_check", 0.0)
+        self.limit_alerted: dict[str, str] = raw.get("limit_alerted", {})   # search id -> reason
 
     @classmethod
     def load(cls) -> "State":

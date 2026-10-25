@@ -8,7 +8,7 @@ _tmp = tempfile.mkdtemp()
 for var in ("XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME"):
     os.environ[var] = str(Path(_tmp) / var)
 
-from rfp import autobuy, data, inventory, watcher  # noqa: E402
+from rfp import autobuy, data, inventory, limits, watcher  # noqa: E402
 from rfp.config import Search, Settings, State  # noqa: E402
 
 
@@ -74,20 +74,24 @@ class InventoryTests(unittest.TestCase):
 
 
 class WatcherTests(unittest.TestCase):
-    def make(self, responses, **kw):
+    def make(self, responses, total=1000.0, **kw):
+        kw.setdefault("auto_buy", True)
         s = Settings(desktop_notifications=False, searches=[search(**kw)])
         s.autobuy.enabled = True
-        bought = []
+        s.autobuy.max_orders = None
+        bought, caps = [], []
 
-        class R:
-            status, order_number = "placed", "W1234567890"
-
-        def buyer(se, store, part, settings):
+        def buyer(se, store, part, settings, cap):
             bought.append((store.store_number, part.sku))
-            return R()
+            caps.append(cap)
+            return autobuy.Result("placed", order_number=f"W{1234567890 + len(bought) - 1}", total=total)
         w = watcher.Watcher(s, State(), fetch=FakeApple(responses), autobuyer=buyer)
         w.budget.sleep = lambda x: None
-        s.save = lambda: None
+        w.state.save = lambda: None
+        w._pause = lambda sid: [setattr(x, "paused", True) for x in w.settings.searches if x.id == sid]
+        w._notify = lambda t, b: w.notices.append(b)
+        w.notices = []
+        w.caps = caps
         return w, bought
 
     def test_dedupe_and_autobuy_once(self):
@@ -107,6 +111,45 @@ class WatcherTests(unittest.TestCase):
         w, bought = self.make([body], auto_buy=True, auto_buy_nearby=True, preferred=["MJQ34LL/A", "MJQ44LL/A"])
         w.sweep()
         self.assertEqual(bought, [("R055", "MJQ34LL/A")])     # first preference wins
+
+    def _flip(self, w, times):
+        """Model comes in, goes out, comes in again: `times` new availabilities."""
+        on = (200, pickup_body([("R230", "Briarwood", {"MJQ34LL/A": "available"})]))
+        off = (200, pickup_body([("R230", "Briarwood", {"MJQ34LL/A": "unavailable"})]))
+        for _ in range(times):
+            for r in (on, off):
+                w.fetch.responses = [r]
+                if not w.settings.searches[0].paused:
+                    w.sweep()
+
+    def test_search_max_orders(self):
+        w, bought = self.make([], max_orders=2)
+        self._flip(w, 4)
+        self.assertEqual(len(bought), 2)
+        self.assertTrue(w.settings.searches[0].paused)
+
+    def test_global_max_orders(self):
+        w, bought = self.make([], max_orders=None)
+        w.settings.autobuy.max_orders = 1
+        self._flip(w, 3)
+        self.assertEqual(len(bought), 1)
+        self.assertEqual(len(w.notices), 1)             # told once, not every time
+        self.assertIn("1 of 1 orders", w.notices[0])
+
+    def test_spending_budget_and_cap(self):
+        w, bought = self.make([], total=1100.0, max_orders=None, max_price=1250.0)
+        w.settings.autobuy.max_total_spend = 2500.0
+        w.settings.autobuy.max_price = 1300.0
+        self._flip(w, 4)
+        self.assertEqual(len(bought), 3)                 # 1100 + 1100, then 300 left < price, but still tried
+        self.assertEqual(w.caps, [1250.0, 1250.0, 300.0])  # tightest of the caps and budget left
+
+    def test_spending_budget_used_up(self):
+        w, bought = self.make([], total=1300.0, max_orders=None)
+        w.settings.autobuy.max_total_spend = 1300.0
+        self._flip(w, 2)
+        self.assertEqual(len(bought), 1)
+        self.assertIn("spending budget used up", w.notices[0])
 
     def test_no_autobuy_without_preferences(self):
         body = (200, pickup_body([("R230", "Briarwood", {"MJQ34LL/A": "available"})]))
@@ -130,6 +173,33 @@ class WatcherTests(unittest.TestCase):
         self.assertEqual(t[0], 1000.0)
         b.acquire()                     # 31st request waits out the window
         self.assertEqual(t[0], 1000.0 + 94 * 60)
+
+
+class LimitsTests(unittest.TestCase):
+    def test_decision(self):
+        s = Settings()
+        st = State()
+        x = search(max_orders=None)
+        self.assertEqual(limits.check(s, st, x).cap, None)
+        st.orders = [{"search": "other", "total": 900}]
+        self.assertFalse(limits.check(s, st, x).allowed)          # default: 1 order overall
+        s.autobuy.max_orders = None
+        s.autobuy.max_total_spend = 1500
+        self.assertEqual(limits.check(s, st, x).cap, 600)
+
+
+class ReloadTests(unittest.TestCase):
+    def test_config_reload(self):
+        s = Settings(searches=[search()])
+        s.save()
+        w = watcher.Watcher(Settings.load(), State())
+        self.assertTrue(w._reload_if_changed())                   # first look records the mtime
+        self.assertFalse(w._reload_if_changed())
+        s.searches.append(search(store="R055"))
+        os.utime(watcher.CONFIG_FILE, (1, 1))
+        s.save()
+        self.assertTrue(w._reload_if_changed())
+        self.assertEqual(len(w.settings.searches), 2)
 
 
 class CheckoutHelpersTests(unittest.TestCase):

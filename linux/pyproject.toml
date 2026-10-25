@@ -7,7 +7,7 @@ name = "readyforpickup"
 version = "1.0.0"
 description = "Watch Apple Store pickup availability on Linux, with optional auto-order"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = { text = "GPL-3.0-only" }
 dependencies = []          # the watcher is standard library only
 

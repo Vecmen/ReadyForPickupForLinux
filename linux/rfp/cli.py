@@ -8,7 +8,7 @@ import logging
 import sys
 from dataclasses import asdict, fields
 
-from rfp import __version__, data, inventory, notify, secrets
+from rfp import __version__, data, inventory, limits, notify, secrets
 from rfp.config import CONFIG_FILE, SCREENSHOT_DIR, STATE_FILE, ALLOWED_INTERVALS, AutoBuySettings, Search, Settings, State
 
 log = logging.getLogger("rfp")
@@ -68,6 +68,10 @@ def _apply_search_flags(search: Search, a) -> None:
                        ("auto_buy", "auto_buy"), ("auto_buy_nearby", "auto_buy_nearby")):
         if (v := getattr(a, flag)) is not None:
             setattr(search, attr, v)
+    if a.max_price is not None:
+        search.max_price = _lim(a.max_price)
+    if a.max_orders is not None:
+        search.max_orders = _lim(a.max_orders)
     if a.custom_sku is not None:
         search.custom_sku = a.custom_sku
     if a.nickname is not None:
@@ -100,6 +104,9 @@ def _describe(x: Search) -> str:
                              ("AUTO-BUY" + ("+nearby" if x.auto_buy_nearby else ""), x.auto_buy),
                              ("paused", x.paused)) if on]
     pref = f" prefer={','.join(x.preferred)}" if x.preferred else ""
+    if x.auto_buy:
+        pref += (f" max-orders={'none' if x.max_orders is None else x.max_orders}"
+                 + (f" max-price={x.max_price:g}" if x.max_price is not None else ""))
     return (f"{data.PRODUCT_NAMES.get(x.product, x.product)} at {x.store_name or x.store} ({x.store}, {x.country})"
             f"{pref}{' [' + ' '.join(flags) + ']' if flags else ''}")
 
@@ -127,9 +134,24 @@ def cmd_search_pause(a, s, paused=True):
 def _autobuyer():
     from rfp import autobuy
 
-    def run(search, store, part, settings):
-        return autobuy.purchase(search, store.store_number, store.store_name, part.sku, settings)
+    def run(search, store, part, settings, cap):
+        try:
+            return autobuy.purchase(search, store.store_number, store.store_name, part.sku, settings, max_price=cap)
+        except SystemExit as e:   # Playwright missing: report, don't stop watching
+            log.error("auto-buy unavailable: %s", e)
+            return autobuy.Result("failed", detail=str(e))
     return run
+
+
+def _session_checker():
+    from rfp import autobuy
+
+    def check(settings, country):
+        try:
+            return autobuy.session_status(settings, country)
+        except SystemExit as e:
+            raise RuntimeError(str(e)) from None
+    return check
 
 
 def cmd_check(a, s):
@@ -137,7 +159,7 @@ def cmd_check(a, s):
     if a.search:
         s.searches = [s.search(a.search)]
     state = State.load()
-    w = Watcher(s, state, autobuyer=_autobuyer() if s.autobuy.enabled else None)
+    w = Watcher(s, state, autobuyer=_autobuyer())
     results = w.sweep()
     for sid, found in results.items():
         x = next(q for q in s.searches if q.id == sid)
@@ -152,9 +174,9 @@ def cmd_check(a, s):
 
 def cmd_watch(a, s):
     from rfp.watcher import Watcher
-    if not any(not x.paused for x in s.searches):
-        raise SystemExit("no active searches; add one with `rfp search add`")
-    Watcher(s, State.load(), autobuyer=_autobuyer() if s.autobuy.enabled else None).run_forever()
+    # Keeps running with no active searches and picks up config edits live,
+    # so the service never needs restarting after `rfp search ...`.
+    Watcher(s, State.load(), autobuyer=_autobuyer(), session_checker=_session_checker()).run_forever()
 
 
 def cmd_buy(a, s):
@@ -168,31 +190,82 @@ def cmd_buy(a, s):
     store = data.find_store(search.country, store_id)
     if store is None:
         raise SystemExit(f"no store {store_id} in {search.country}")
+    decision = limits.check(s, State.load(), search)
+    if not decision.allowed and not a.dry_run:
+        raise SystemExit(f"not ordering: {decision.reason} (`rfp limits` to see or raise them)")
+    cap = decision.cap if decision.allowed else s.autobuy.max_price
     if not a.dry_run and not a.yes:
         ok = input(f"This will try to ORDER {sku} for pickup at {store.name}"
+                   f"{'' if cap is None else f' (max {cap:,.2f})'}"
                    f"{'' if s.autobuy.place_order else ' (stopping at the final page)'}. Continue? [y/N] ")
         if ok.strip().lower() != "y":
             return
-    r = autobuy.purchase(search, store.id, store.name, sku, s, dry_run=a.dry_run)
+    r = autobuy.purchase(search, store.id, store.name, sku, s, dry_run=a.dry_run, max_price=cap)
     print(f"{r.status}: {r.detail}" + (f"  order {r.order_number}" if r.order_number else ""))
     print(f"screenshots: {r.screenshots}")
     if r.status == "placed":
+        from rfp.watcher import record_order
         st = State.load()
-        st.orders.append({"search": search.id, "sku": sku, "store": store.id, "order": r.order_number})
+        record_order(st, search, sku, store.id, r)
         st.save()
-        search.paused = True
-        s.save()
+        if limits.search_done(st, search):
+            search.paused = True
+            s.save()
 
 
 def cmd_orders(a, s):
     st = State.load()
     for o in st.orders:
-        print(f"{o.get('order') or '(no number)'}  {o['sku']} @ {o['store']}  search {o['search']}")
+        total = f"  {o['total']:,.2f}" if o.get("total") else ""
+        print(f"{o.get('order') or '(no number)'}  {o['sku']} @ {o['store']}  search {o['search']}{total}")
     for sid, attempts in st.autobuy_attempts.items():
         for line in attempts[-10:]:
             print(f"attempt [{sid}] {line}")
     if not st.orders and not st.autobuy_attempts:
         print("no orders or attempts yet")
+
+
+# ---------------------------------------------------------------- limits
+def cmd_limits_show(a, s):
+    for line in limits.summary(s, State.load()):
+        print(line)
+    print("\nChange with: rfp limits set --orders N --spend AMOUNT --price AMOUNT  (\"none\" = no limit)")
+
+
+def cmd_limits_set(a, s):
+    if a.orders is None and a.spend is None and a.price is None:
+        raise SystemExit("give at least one of --orders, --spend, --price")
+    if a.orders is not None:
+        s.autobuy.max_orders = _lim(a.orders)
+    if a.spend is not None:
+        s.autobuy.max_total_spend = _lim(a.spend)
+    if a.price is not None:
+        s.autobuy.max_price = _lim(a.price)
+    s.save()
+    cmd_limits_show(a, s)
+
+
+def _limit_num(kind):
+    def parse(v: str):
+        if v.lower() in ("none", "off", "unlimited"):
+            return LIMIT_OFF
+        n = kind(v.replace(",", "").lstrip("$"))
+        if n < 0:
+            raise argparse.ArgumentTypeError("must be 0 or more")
+        return n
+    parse.__name__ = kind.__name__
+    return parse
+
+
+class _Off:
+    """argparse value meaning "remove this limit" (stored as None)."""
+
+
+LIMIT_OFF = _Off()
+
+
+def _lim(v):
+    return None if v is LIMIT_OFF else v
 
 
 # ---------------------------------------------------------------- config / secrets
@@ -339,6 +412,10 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--country", "-c", default="US" if add else None)
         sp.add_argument("--store", "-s", default="R032" if add else None, help="store id, e.g. R032")
         sp.add_argument("--prefer", nargs="*", metavar="SKU", help="preferred models (alerts and auto-order)")
+        sp.add_argument("--max-price", type=_limit_num(float), metavar="AMOUNT",
+                        help="auto-buy: most one order may cost (\"none\" = no limit)")
+        sp.add_argument("--max-orders", type=_limit_num(int), metavar="N",
+                        help="auto-buy: orders this search may place, default 1 (\"none\" = no limit)")
         sp.add_argument("--custom-sku")
         sp.add_argument("--nickname")
         for name, helptext in (("only-preferred", "show only preferred models"),
@@ -375,6 +452,15 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("-y", "--yes", action="store_true")
     x.set_defaults(fn=cmd_buy)
     sub.add_parser("orders", help="orders placed and auto-order attempts").set_defaults(fn=cmd_orders)
+
+    lim = sub.add_parser("limits", help="auto-buy limits: orders, spending, price per order")
+    lim.set_defaults(fn=cmd_limits_show)
+    limsub = lim.add_subparsers(dest="sub")
+    x = limsub.add_parser("set", help='e.g. --orders 2 --spend 2500 --price 1299 ("none" = no limit)')
+    x.add_argument("--orders", type=_limit_num(int), metavar="N", help="orders across all searches")
+    x.add_argument("--spend", type=_limit_num(float), metavar="AMOUNT", help="total of all orders")
+    x.add_argument("--price", type=_limit_num(float), metavar="AMOUNT", help="most one order may cost")
+    x.set_defaults(fn=cmd_limits_set)
 
     cfg = sub.add_parser("config", help="settings").add_subparsers(dest="sub", required=True)
     cfg.add_parser("show").set_defaults(fn=cmd_config_show)

@@ -1,4 +1,4 @@
-# ReadyForPickup for Linux (Arch)
+# ReadyForPickup for Linux (Arch and Ubuntu)
 
 A Linux port of the macOS app: it watches Apple Store **pickup** availability for
 iPhone and Mac models at a store (and nearby stores), alerts you with desktop
@@ -27,9 +27,43 @@ yay -S python-playwright                   # AUR; or: pip install --user playwri
 
 `rfp` uses `/usr/bin/chromium` (then Chrome / Brave) through Playwright, so
 `playwright install` isn't needed. To use Playwright's own Chromium instead,
-set `rfp config set autobuy.browser_executable /path/to/chrome`.
+run `rfp config set autobuy.browser_executable bundled` (or give a path).
 
 Without installing: `cd linux && python -m rfp --help`.
+
+## Install on Ubuntu (22.04+, GNOME), e.g. a VM left running
+
+Copy the whole `ReadyForPickup` folder to the VM (the installer needs
+`ReadyForPickup/*.json` next to `linux/`), then, as your normal desktop user:
+
+```sh
+cd ReadyForPickup/linux/ubuntu
+./install.sh                 # or ./install.sh --no-autobuy for alerts only
+```
+
+It installs the apt packages it needs (sudo), puts the app in
+`~/.local/share/readyforpickup/venv`, downloads Playwright's Chromium (Ubuntu's
+own Chromium is a snap that can't be automated this way), adds `rfp` to
+`~/.local/bin`, and installs and starts a systemd **user** service tied to your
+GNOME session. It asks two questions:
+
+* **Does the VM log in automatically?** With automatic login GNOME leaves your
+  keyring locked, so it offers to keep secrets in
+  `~/.config/readyforpickup/secrets.json` (readable only by you, not
+  encrypted) instead. Say no if you type your password at login.
+* **Turn off screen lock, blanking and suspend?** Recommended, so the VM keeps
+  working while nobody is looking.
+
+For it to come back by itself after the VM reboots, turn on automatic login
+(Settings → Users → Automatic Login). To reach the desktop when it hands you a
+checkout or asks for a 2FA code, turn on Settings → System → Remote Desktop →
+**Desktop Sharing** (it shares the session that's already logged in) and
+connect with any RDP client. Pushover is the best way to hear about it on your
+phone (`rfp pushover set`).
+
+Service: `systemctl --user status readyforpickup`, log:
+`journalctl --user -u readyforpickup -f`. Remove with `./uninstall.sh`
+(`--purge` also deletes your settings, history and secrets).
 
 ## Watch a store
 
@@ -49,6 +83,10 @@ the ones that alert you (if a search has none, every model alerts). Flags on
 `search add` / `search edit`: `--no-nearby`, `--only-preferred`,
 `--custom-sku SKU --nickname NAME`, `--no-desktop`, `--no-pushover`.
 `rfp search list | pause | resume | remove <id>`.
+
+The running service picks up `rfp search ...`, `rfp limits ...` and
+`rfp config set` changes within a minute: no restart needed. With no active
+searches it waits instead of exiting.
 
 **Pushover:** `rfp pushover set` (your own app token + user key, kept in the
 keyring), then `rfp pushover test`. `rfp config set pushover_high_priority true`
@@ -91,7 +129,10 @@ throttled check backs off 2×, 4×, … up to an hour.
    A dry run works even when the item is out of stock up to the store step,
    so do it ahead of a launch and again after Apple redesigns its store.
 
-4. **Choose how far it goes:**
+4. **Set your limits** (see [Limits](#limits)): by default it places at most
+   **1 order in total**.
+
+5. **Choose how far it goes:**
    * Default (`autobuy.place_order false`): when a preferred model appears it
      fills the whole checkout, alerts you, and leaves the window on *Place Your
      Order* for you to press. It notices when you do and records the order.
@@ -105,15 +146,39 @@ What it does when a preferred model appears at your store
 * empties your bag, adds that model, checks the bag holds exactly 1 item at quantity 1;
 * checks out for **pickup** at that store with the first time slot, your
   account's pickup contact and saved payment;
-* refuses to place the order if the total is over `max_price` or can't be read;
-* pauses the search after an order, so it never buys twice;
+* checks your [limits](#limits) first, and refuses to place the order if the
+  total is over the tightest price cap or budget left, or can't be read;
+* pauses the search once it has placed the orders it's allowed;
 * if any step fails (Apple changed a page, the slot vanished, a 2FA prompt), it
   alerts you and leaves the browser **mid-checkout** for you to finish, for
   `autobuy.handoff_minutes` (30).
 
+If auto-buy is armed, every 12 hours it also checks that your Apple sign-in is
+still valid and alerts you if it has expired, so you find out before a drop,
+not during one (`autobuy.session_check_hours`, 0 = off).
+
 `rfp orders` lists orders and attempts. `rfp account status` shows whether the
 session is signed in. `rfp account forget [--session]` deletes the saved
 Apple ID, card and (with `--session`) the sign-in.
+
+### Limits
+
+```sh
+rfp limits                                   # what's set and what's been used
+rfp limits set --orders 2                    # orders across all searches (default 1)
+rfp limits set --spend 2500                  # total of all orders, tax included
+rfp limits set --price 1300                  # the most one order may cost
+rfp search edit <id> --max-orders 1 --max-price 1250   # per search
+```
+
+Use `none` to remove a limit (`rfp limits set --orders none`). Before every
+auto-order it checks the order counts (overall and for that search), then
+gives the checkout the **tightest** of the per-order price, the search's price
+and the budget left. If the total on Apple's final page is over that, it
+doesn't place the order: it alerts you and leaves the checkout open in case you
+want to buy anyway. When a limit is reached it tells you once and stops
+ordering until you raise it. Orders you place yourself during a hand-off count
+too. `rfp buy` follows the same limits.
 
 ### Keeping it working
 
@@ -142,7 +207,7 @@ The checkout logic is tested against a local mock of the store flow
 | `~/.config/readyforpickup/config.json` | settings and searches (no secrets) |
 | `~/.local/state/readyforpickup/state.json` | alert dedupe, request log, backoff, orders |
 | `~/.local/share/readyforpickup/browser-profile/` | the signed-in apple.com browser session |
-| keyring, service `readyforpickup` | Pushover keys, Apple ID, card |
+| keyring, service `readyforpickup` | Pushover keys, Apple ID, card (or `secrets.json` with `RFP_SECRETS=file`) |
 
 ## Tests
 

@@ -12,9 +12,9 @@ ReadyForPickup — a macOS app that watches Apple Store pickup availability for 
 
 A native SwiftUI companion for iPhone and iPad is available in [`ios/`](ios/README.md). It supports iOS 17 or later and builds locally in Xcode. See the iOS guide for setup, verification flows, and the limitations of background inventory checks.
 
-## Linux (Arch) port
+## Linux port (Arch and Ubuntu)
 
-A command-line and systemd version for Linux, with optional auto-order through your Apple account, is in [`linux/`](linux/README.md).
+A command-line and systemd version for Arch and Ubuntu, with optional auto-order and spending limits through your Apple account, is in [`linux/`](linux/README.md).
 
 ## About this fork
 

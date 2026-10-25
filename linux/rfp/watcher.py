@@ -12,8 +12,8 @@ import logging
 import math
 import time
 
-from rfp import data, inventory, notify
-from rfp.config import Search, Settings, State
+from rfp import data, inventory, limits, notify
+from rfp.config import CONFIG_FILE, Search, Settings, State
 
 log = logging.getLogger("rfp")
 
@@ -63,10 +63,13 @@ def _counts(search: Search, sku: str) -> bool:
 
 
 class Watcher:
-    def __init__(self, settings: Settings, state: State, fetch=inventory.http_get, autobuyer=None):
+    def __init__(self, settings: Settings, state: State, fetch=inventory.http_get, autobuyer=None,
+                 session_checker=None):
         self.settings, self.state, self.fetch = settings, state, fetch
         self.budget = RequestBudget(state)
-        self.autobuyer = autobuyer  # callable(search, store, part, settings) -> autobuy.Result
+        # callable(search, store, part, settings, max_price) -> autobuy.Result
+        self.autobuyer = autobuyer
+        self.session_checker = session_checker  # callable(settings, country_code) -> bool
 
     # ---- one sweep -------------------------------------------------------
     def sweep(self) -> dict[str, list]:
@@ -139,6 +142,16 @@ class Watcher:
         if not search.preferred and not search.custom:
             log.warning("[%s] auto-buy skipped: set preferred models first so it can't buy the wrong one", search.id)
             return
+        decision = limits.check(self.settings, self.state, search)
+        if not decision.allowed:
+            log.warning("[%s] auto-buy skipped: %s", search.id, decision.reason)
+            if self.state.limit_alerted.get(search.id) != decision.reason:   # tell you once, not every sweep
+                self.state.limit_alerted[search.id] = decision.reason
+                self.state.save()
+                self._notify("Auto-buy limit reached", f"Not ordering: {decision.reason}. "
+                             "Raise it with `rfp limits set` if you want more.")
+            return
+        self.state.limit_alerted.pop(search.id, None)
         priority = list(search.preferred) + ([search.custom[0]] if search.custom else [])
         candidates = []
         for st, ps in fresh:
@@ -150,32 +163,113 @@ class Watcher:
         if not candidates:
             return
         _, _, store, part = min(candidates, key=lambda c: (c[0], c[1]))
-        log.info("[%s] auto-buy: %s at %s", search.id, part.name, store.store_name)
-        result = self.autobuyer(search, store, part, self.settings)
+        cap = "no price limit" if decision.cap is None else f"max {decision.cap:,.2f}"
+        log.info("[%s] auto-buy: %s at %s (%s)", search.id, part.name, store.store_name, cap)
+        result = self.autobuyer(search, store, part, self.settings, decision.cap)
         self.state.autobuy_attempts.setdefault(search.id, []).append(
             f"{time.strftime('%Y-%m-%d %H:%M')} {part.sku}@{store.store_number}: {result.status}")
         if result.status == "placed":
-            self.state.orders.append({"search": search.id, "sku": part.sku, "store": store.store_number,
-                                      "order": result.order_number, "at": time.time()})
-            search.paused = True   # one order per search: never buy twice
-            self.settings.save()
+            record_order(self.state, search, part.sku, store.store_number, result)
+            if limits.search_done(self.state, search):
+                self._pause(search.id)
         self.state.save()
 
+    def _pause(self, search_id: str) -> None:
+        """Pause a search in the saved config without losing edits made meanwhile."""
+        fresh = Settings.load()
+        for s in fresh.searches:
+            if s.id == search_id:
+                s.paused = True
+        fresh.save()
+        self.settings = fresh
+        self._config_mtime = _mtime()
+
+    def _notify(self, title: str, body: str) -> None:
+        if self.settings.desktop_notifications:
+            notify.desktop(title, body, urgent=True)
+        if self.settings.pushover_enabled and notify.pushover_configured():
+            try:
+                notify.pushover(title, body, high_priority=self.settings.pushover_high_priority)
+            except Exception as e:
+                log.error("Pushover send failed: %s", e)
+
     # ---- loop -----------------------------------------------------------
+    _config_mtime = 0.0
+
+    def _reload_if_changed(self) -> bool:
+        """Pick up `rfp search ...` / `rfp config set` edits without a restart."""
+        m = _mtime()
+        if m and m != self._config_mtime:
+            if self._config_mtime:
+                self.settings = Settings.load()
+                log.info("config changed; reloaded (%d active search(es))",
+                         sum(not s.paused for s in self.settings.searches))
+            self._config_mtime = m
+            return True
+        return False
+
+    def _check_session(self) -> None:
+        ab = self.settings.autobuy
+        armed = [s for s in self.settings.searches if s.auto_buy and not s.paused]
+        if not (ab.enabled and armed and ab.session_check_hours and self.session_checker):
+            return
+        if time.time() - self.state.last_session_check < ab.session_check_hours * 3600:
+            return
+        self.state.last_session_check = time.time()
+        self.state.save()
+        try:
+            ok = self.session_checker(self.settings, armed[0].country)
+        except Exception as e:   # browser busy or missing: try again next time
+            log.warning("couldn't check the Apple sign-in: %s", e)
+            return
+        if ok:
+            log.info("Apple sign-in still valid")
+        else:
+            log.warning("Apple sign-in has expired")
+            self._notify("Apple sign-in expired",
+                         "Auto-buy can't check out until you sign in again: run `rfp account login`.")
+
     def run_forever(self) -> None:
-        floor = min_interval_minutes(self.settings)
-        interval = max(self.settings.interval_minutes, floor)
-        if interval > self.settings.interval_minutes:
-            log.warning("interval raised from %d to %d min to stay inside Apple's request budget",
-                        self.settings.interval_minutes, interval)
-        log.info("watching %d search(es) every %d min", sum(not s.paused for s in self.settings.searches), interval)
+        idle_logged = False
+        interval = self.settings.interval_minutes
         while True:
+            if self._reload_if_changed() or not idle_logged:
+                floor = min_interval_minutes(self.settings)
+                interval = max(self.settings.interval_minutes, floor)
+                if interval > self.settings.interval_minutes:
+                    log.warning("interval raised from %d to %d min to stay inside Apple's request budget",
+                                self.settings.interval_minutes, interval)
+            active = sum(not s.paused for s in self.settings.searches)
+            if not active:
+                if not idle_logged:
+                    log.info("no active searches; waiting for one (`rfp search add` or `rfp search resume`)")
+                    idle_logged = True
+                time.sleep(30)
+                continue
+            if idle_logged:
+                log.info("watching %d search(es) every %d min", active, interval)
+                idle_logged = False
             if (wait := self.state.throttled_until - time.time()) > 0:
                 log.info("throttled; next try in %d s", wait)
                 time.sleep(wait)
+            self._check_session()
             started = time.time()
             self.sweep()
-            if not any(not s.paused for s in self.settings.searches):
-                log.info("no active searches left; exiting")
-                return
-            time.sleep(max(10, interval * 60 - (time.time() - started)))
+            # Sleep in short steps so config edits take effect promptly.
+            end = started + max(10, interval * 60)
+            while time.time() < end:
+                time.sleep(min(30, max(0, end - time.time())))
+                if self._reload_if_changed():
+                    break
+
+
+def _mtime() -> float:
+    try:
+        return CONFIG_FILE.stat().st_mtime
+    except FileNotFoundError:
+        return 0.0
+
+
+def record_order(state: State, search: Search, sku: str, store: str, result) -> None:
+    state.orders.append({"search": search.id, "sku": sku, "store": store, "order": result.order_number,
+                         "total": getattr(result, "total", None), "at": time.time()})

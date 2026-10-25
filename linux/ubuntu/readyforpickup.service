@@ -1,0 +1,17 @@
+[Unit]
+Description=ReadyForPickup: watch Apple Store pickup availability
+# Runs inside your GNOME session, so auto-order's browser window, desktop
+# notifications and the keyring all work. With automatic login it starts
+# by itself after the VM reboots.
+PartOf=graphical-session.target
+After=graphical-session.target network-online.target
+
+[Service]
+Type=simple
+ExecStart=@RFP@ watch
+Restart=on-failure
+RestartSec=60
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=graphical-session.target

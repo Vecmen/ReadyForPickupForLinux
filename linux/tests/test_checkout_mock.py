@@ -85,7 +85,7 @@ class CheckoutAgainstMockStore(unittest.TestCase):
     def test_price_cap_blocks_order(self):
         r, store = self.run_flow(place_order=True, max_price=999)
         self.assertEqual(r.status, "handed_off")
-        self.assertIn("max_price", r.detail)
+        self.assertIn("over your limit of 999.00", r.detail)
         self.assertEqual(store.orders, [])
 
 
