@@ -89,6 +89,34 @@ the ones that alert you (if a search has none, every model alerts). Flags on
 `--custom-sku SKU --nickname NAME`, `--no-desktop`, `--no-pushover`.
 `rfp search list | pause | resume | remove <id>`.
 
+### Several stores for one model
+
+One search can watch, and auto-buy at, a list of stores. The first one listed
+is where Apple's lookup is centred, and the order is your preference:
+
+```sh
+rfp search add -p iPhonePro18 --prefer MJQ34LL/A --auto-buy \
+    --stores R230 R041 R055 R763 --group iphone
+rfp nearby <id>        # which stores that lookup covers (* = watched)
+```
+
+Apple answers for all of a lookup's nearby stores in **one request**, so one
+search with a store list checks as often as a single store. Separate searches
+each cost a request, so five of them check about every 16 minutes instead of 5.
+
+Stores too far apart to show up in one lookup need their own search. Put them
+in the **same group**; when any search in a group places an order, all of them
+pause, and the group won't order again:
+
+```sh
+rfp search add -p iPhonePro18 --prefer MJQ34LL/A --auto-buy --stores R132 --group iphone
+```
+
+If a listed store isn't in its search's lookup, the log says so. Use
+`--stores` with nothing after it to go back to "my store plus nearby", and
+`--group ""` to leave a group. To buy again after a group has ordered, give its
+searches a new group name and `rfp search resume` them.
+
 The running service picks up `rfp search ...`, `rfp limits ...` and
 `rfp config set` changes within a minute: no restart needed. With no active
 searches it waits instead of exiting.

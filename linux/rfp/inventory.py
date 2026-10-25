@@ -47,6 +47,7 @@ class StoreResult:
     city: str
     state: str | None
     parts: list[Part] = field(default_factory=list)
+    distance: str = ""      # as Apple words it, e.g. "12.4 mi"; empty if not sent
 
     @property
     def location(self) -> str:
@@ -98,10 +99,16 @@ def http_get(url: str, headers: dict[str, str]) -> tuple[int, bytes]:
 
 def fetch_inventory(search: Search, fetch: Fetcher = http_get,
                     on_request: Callable[[], None] | None = None) -> list[tuple[StoreResult, list[Part]]]:
-    """Available parts per store for `search`, own store first.
+    """Available parts per store for `search`, its stores in preference order.
 
     `on_request` is called before each HTTP request (the rate limiter hooks in
     here). Raises Throttled on HTTP 429/541."""
+    return available_models(fetch_stores(search, fetch, on_request), search)
+
+
+def fetch_stores(search: Search, fetch: Fetcher = http_get,
+                 on_request: Callable[[], None] | None = None) -> list[StoreResult]:
+    """Every store Apple's lookup for `search` returned, in Apple's order."""
     c = data.country(search.country)
     if search.product not in c.products:
         raise InventoryError(f"{data.PRODUCT_NAMES.get(search.product, search.product)} isn't sold in {c.name}")
@@ -124,7 +131,7 @@ def fetch_inventory(search: Search, fetch: Fetcher = http_get,
                 have = {p.sku for p in existing.parts}
                 existing.parts += [p for p in store.parts if p.sku not in have]
 
-    return available_models(list(merged.values()), search)
+    return list(merged.values())
 
 
 def parse_response(status: int, body: bytes, search: Search, c: data.Country) -> list[StoreResult]:
@@ -164,7 +171,8 @@ def parse_response(status: int, body: bytes, search: Search, c: data.Country) ->
                 continue
             pname = c.sku_name(search.product, sku) or (search.custom[1] if search.custom and search.custom[0] == sku else sku)
             parts.append(Part(sku, pname, disp))
-        out.append(StoreResult(number, name, city, s.get("state"), parts))
+        dist = s.get("storeDistanceWithUnit") or ""
+        out.append(StoreResult(number, name, city, s.get("state"), parts, str(dist)))
     return out
 
 
@@ -172,11 +180,22 @@ def available_models(stores: list[StoreResult], search: Search) -> list[tuple[St
     flt = None
     if search.only_preferred:
         flt = set(search.preferred) | ({search.custom[0]} if search.custom else set())
-    own = [s for s in stores if s.store_number == search.store]
-    scoped = own + [s for s in stores if s.store_number != search.store] if search.include_nearby else own
+    scoped = watched_stores(stores, search)
     result = []
     for store in scoped:
         avail = [p for p in store.parts if p.availability == "available" and (flt is None or p.sku in flt)]
         if avail:
             result.append((store, avail))
     return result
+
+
+def watched_stores(stores: list[StoreResult], search: Search) -> list[StoreResult]:
+    """The stores a search watches, best first.
+
+    With a store list: exactly those stores, in the listed order. Otherwise the
+    search's own store, then (with include_nearby) the others in Apple's order."""
+    if search.stores:
+        by_id = {s.store_number: s for s in stores}
+        return [by_id[sid] for sid in search.stores if sid in by_id]
+    own = [s for s in stores if s.store_number == search.store]
+    return own + [s for s in stores if s.store_number != search.store] if search.include_nearby else own

@@ -5,6 +5,7 @@ Limits (unset = no limit):
   autobuy.max_total_spend   total of all placed orders' totals
   autobuy.max_price         one order's total
   search.max_orders         orders placed by that search (default 1)
+  search.group              one order per group of searches
   search.max_price          one order's total for that search
 
 Every placed order is recorded in state.json with its total, whether the
@@ -39,6 +40,9 @@ def check(settings: Settings, state: State, search: Search) -> Decision:
         return Decision(False, f"auto-buy limit reached: {orders_placed(state)} of {ab.max_orders} orders placed")
     if search.max_orders is not None and orders_placed(state, search.id) >= search.max_orders:
         return Decision(False, f"this search already placed {search.max_orders} order(s)")
+    if search.group and any(o.get("group") == search.group for o in state.orders):
+        return Decision(False, f"group {search.group!r} already placed its order (give the searches a new group "
+                               "name to buy again)")
     caps = [c for c in (ab.max_price, search.max_price) if c is not None]
     if ab.max_total_spend is not None:
         left = ab.max_total_spend - spent(state)

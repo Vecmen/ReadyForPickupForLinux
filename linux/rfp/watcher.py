@@ -75,8 +75,12 @@ class Watcher:
     def sweep(self) -> dict[str, list]:
         results: dict[str, list] = {}
         for search in [s for s in self.settings.searches if not s.paused]:
+            if search.paused:   # paused during this sweep, e.g. its group just ordered
+                continue
             try:
-                found = inventory.fetch_inventory(search, self.fetch, on_request=self.budget.acquire)
+                stores = inventory.fetch_stores(search, self.fetch, on_request=self.budget.acquire)
+                self._warn_missing_stores(search, stores)
+                found = inventory.available_models(stores, search)
             except inventory.Throttled as e:
                 self._register_throttle(e.status)
                 return results      # a throttled response ends the sweep
@@ -90,6 +94,17 @@ class Watcher:
         self.state.throttled_until = 0.0
         self.state.save()
         return results
+
+    def _warn_missing_stores(self, search: Search, stores) -> None:
+        """A listed store Apple didn't return can't be watched from this search."""
+        seen = {s.store_number for s in stores}
+        warned = self.__dict__.setdefault("_missing_warned", set())
+        for sid in search.stores:
+            if sid not in seen and (search.id, sid) not in warned:
+                warned.add((search.id, sid))
+                log.warning("[%s] store %s isn't among the stores Apple returns near %s, so this search can't "
+                            "watch it; watch it from its own search in the same group (see `rfp nearby %s`)",
+                            search.id, sid, search.store, search.id)
 
     def _register_throttle(self, status: int) -> None:
         self.state.throttle_failures += 1
@@ -155,11 +170,19 @@ class Watcher:
         priority = list(search.preferred) + ([search.custom[0]] if search.custom else [])
         candidates = []
         for st, ps in fresh:
-            if st.store_number != search.store and not search.auto_buy_nearby:
+            if search.stores:            # the listed stores, preferred in listed order
+                if st.store_number not in search.stores:
+                    continue
+                rank = search.stores.index(st.store_number)
+            elif st.store_number == search.store:
+                rank = 0
+            elif search.auto_buy_nearby:
+                rank = 1
+            else:
                 continue
             for p in ps:
                 if search.is_preferred(p.sku):
-                    candidates.append((priority.index(p.sku), st.store_number != search.store, st, p))
+                    candidates.append((priority.index(p.sku), rank, st, p))
         if not candidates:
             return
         _, _, store, part = min(candidates, key=lambda c: (c[0], c[1]))
@@ -170,15 +193,23 @@ class Watcher:
             f"{time.strftime('%Y-%m-%d %H:%M')} {part.sku}@{store.store_number}: {result.status}")
         if result.status == "placed":
             record_order(self.state, search, part.sku, store.store_number, result)
-            if limits.search_done(self.state, search):
-                self._pause(search.id)
+            stop = [search.id] if limits.search_done(self.state, search) else []
+            if search.group:             # the rest of the group stops too
+                stop += [s.id for s in self.settings.searches if s.group == search.group]
+            if stop:
+                self._pause(*stop)
+                if search.group:
+                    log.info("order placed; paused group %r (%d search(es))", search.group, len(set(stop)))
         self.state.save()
 
-    def _pause(self, search_id: str) -> None:
-        """Pause a search in the saved config without losing edits made meanwhile."""
+    def _pause(self, *search_ids: str) -> None:
+        """Pause searches in the saved config without losing edits made meanwhile."""
+        for s in self.settings.searches:   # the sweep in progress sees it too
+            if s.id in search_ids:
+                s.paused = True
         fresh = Settings.load()
         for s in fresh.searches:
-            if s.id == search_id:
+            if s.id in search_ids:
                 s.paused = True
         fresh.save()
         self.settings = fresh
@@ -271,5 +302,6 @@ def _mtime() -> float:
 
 
 def record_order(state: State, search: Search, sku: str, store: str, result) -> None:
-    state.orders.append({"search": search.id, "sku": sku, "store": store, "order": result.order_number,
+    state.orders.append({"search": search.id, "group": search.group, "sku": sku, "store": store,
+                         "order": result.order_number,
                          "total": getattr(result, "total", None), "at": time.time()})

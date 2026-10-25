@@ -56,6 +56,14 @@ def _apply_search_flags(search: Search, a) -> None:
     if store is None:
         raise SystemExit(f"no store {search.store} in {c.name}; `rfp stores -c {c.code} --find <city>`")
     search.store_name = store.name
+    if a.stores is not None:
+        ids = list(dict.fromkeys(x.upper() for x in a.stores))
+        bad = [x for x in ids if data.find_store(search.country, x) is None]
+        if bad:
+            raise SystemExit(f"no store {', '.join(bad)} in {c.name}; `rfp stores -c {c.code} --find <city>`")
+        search.stores = ids
+    if a.group is not None:
+        search.group = a.group.strip()
     if a.prefer is not None:
         known = dict(c.products[search.product])
         bad = [x for x in a.prefer if x not in known and x != search.custom_sku]
@@ -84,10 +92,14 @@ def cmd_search_add(a, s):
     if not a.product:
         raise SystemExit("--product is required")
     search = Search(product=a.product)
+    if not a.store:   # the lookup location: the first listed store, else SoHo
+        a.store = a.stores[0] if a.stores else "R032"
     _apply_search_flags(search, a)
     s.searches.append(search)
     s.save()
     print(f"added search {search.id}: {_describe(search)}")
+    if search.stores:
+        print(f"tip: `rfp nearby {search.id}` checks that Apple's lookup covers all of those stores")
     if search.auto_buy and not s.autobuy.enabled:
         print("note: auto-order is off globally; `rfp config set autobuy.enabled true` to arm it")
 
@@ -100,10 +112,14 @@ def cmd_search_edit(a, s):
 
 
 def _describe(x: Search) -> str:
-    flags = [f for f, on in (("nearby", x.include_nearby), ("only-preferred", x.only_preferred),
-                             ("AUTO-BUY" + ("+nearby" if x.auto_buy_nearby else ""), x.auto_buy),
+    flags = [f for f, on in (("nearby", x.include_nearby and not x.stores), ("only-preferred", x.only_preferred),
+                             ("AUTO-BUY" + ("+nearby" if x.auto_buy_nearby and not x.stores else ""), x.auto_buy),
                              ("paused", x.paused)) if on]
     pref = f" prefer={','.join(x.preferred)}" if x.preferred else ""
+    if x.stores:
+        pref += f" stores={','.join(x.stores)}"
+    if x.group:
+        pref += f" group={x.group}"
     if x.auto_buy:
         pref += (f" max-orders={'none' if x.max_orders is None else x.max_orders}"
                  + (f" max-price={x.max_price:g}" if x.max_price is not None else ""))
@@ -170,6 +186,30 @@ def cmd_check(a, s):
             print(f"   {store.store_name} ({store.location})")
             for p in parts:
                 print(f"     {'★' if x.is_preferred(p.sku) else ' '} {p.sku:<12} {p.name}")
+
+
+def cmd_nearby(a, s):
+    """Which stores one lookup returns (costs one Apple request)."""
+    from rfp.watcher import RequestBudget
+    if a.id:
+        search = s.search(a.id)
+    else:
+        if not a.store:
+            raise SystemExit("give a search id, or --store (and --product)")
+        search = Search(product=a.product, country=a.country.upper(), store=a.store.upper())
+    stores = inventory.fetch_stores(search, on_request=RequestBudget(State.load()).acquire)
+    watched = {st.store_number for st in inventory.watched_stores(stores, search)}
+    print(f"Apple's lookup near {search.store} returns {len(stores)} store(s):")
+    for st in stores:
+        mark = "*" if st.store_number in watched else " "
+        stock = sum(p.availability == "available" for p in st.parts)
+        print(f" {mark} {st.store_number}  {st.store_name:<26} {st.location:<22} {st.distance:>9}  "
+              f"{stock} model(s) in stock")
+    missing = [x for x in search.stores if x not in {st.store_number for st in stores}]
+    print("\n* = watched by this search")
+    if missing:
+        print(f"not covered by this lookup: {', '.join(missing)}. Watch those from another search with the "
+              f"same --group" + (f" ({search.group})" if search.group else "") + ".")
 
 
 def cmd_watch(a, s):
@@ -410,7 +450,11 @@ def build_parser() -> argparse.ArgumentParser:
     def search_flags(sp, add: bool):
         sp.add_argument("--product", "-p", required=False)
         sp.add_argument("--country", "-c", default="US" if add else None)
-        sp.add_argument("--store", "-s", default="R032" if add else None, help="store id, e.g. R032")
+        sp.add_argument("--store", "-s", help="store id, e.g. R230: where Apple's lookup is centred")
+        sp.add_argument("--stores", nargs="*", metavar="R###",
+                        help="watch and auto-buy at exactly these stores, best first (none = clear)")
+        sp.add_argument("--group", metavar="NAME",
+                        help="searches in a group stop together once one of them orders (\"\" = none)")
         sp.add_argument("--prefer", nargs="*", metavar="SKU", help="preferred models (alerts and auto-order)")
         sp.add_argument("--max-price", type=_limit_num(float), metavar="AMOUNT",
                         help="auto-buy: most one order may cost (\"none\" = no limit)")
@@ -438,6 +482,13 @@ def build_parser() -> argparse.ArgumentParser:
         x = srch.add_parser(name)
         x.add_argument("id")
         x.set_defaults(fn=fn)
+
+    x = sub.add_parser("nearby", help="which stores one lookup covers (uses one Apple request)")
+    x.add_argument("id", nargs="?", help="a search id")
+    x.add_argument("-s", "--store")
+    x.add_argument("-p", "--product", default="iPhonePro18")
+    x.add_argument("-c", "--country", default="US")
+    x.set_defaults(fn=cmd_nearby)
 
     x = sub.add_parser("check", help="check once now")
     x.add_argument("--search")

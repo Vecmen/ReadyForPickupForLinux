@@ -175,6 +175,70 @@ class WatcherTests(unittest.TestCase):
         self.assertEqual(t[0], 1000.0 + 94 * 60)
 
 
+class MultiStoreTests(unittest.TestCase):
+    BODY = (200, pickup_body([
+        ("R230", "Briarwood", {"MJQ34LL/A": "unavailable"}),
+        ("R055", "Somerset", {"MJQ34LL/A": "available"}),
+        ("R041", "Twelve Oaks", {"MJQ34LL/A": "available"}),
+        ("R999", "Far Away", {"MJQ34LL/A": "available"}),
+    ]))
+
+    def make(self, searches):
+        s = Settings(desktop_notifications=False, searches=searches)
+        s.autobuy.enabled = True
+        s.autobuy.max_orders = None
+        bought = []
+
+        def buyer(se, store, part, settings, cap):
+            bought.append((se.id, store.store_number))
+            return autobuy.Result("placed", order_number="W1", total=900.0)
+        w = watcher.Watcher(s, State(), fetch=FakeApple([self.BODY]), autobuyer=buyer)
+        w.budget.sleep = lambda x: None
+        w.state.save = lambda: None
+        w._pause = lambda *ids: [setattr(x, "paused", True) for x in w.settings.searches if x.id in ids]
+        w._notify = lambda t, b: None
+        return w, bought
+
+    def test_store_list_watches_only_listed_in_order(self):
+        x = search(stores=["R041", "R230", "R055"])
+        got = inventory.fetch_inventory(x, FakeApple([self.BODY]))
+        self.assertEqual([st.store_number for st, _ in got], ["R041", "R055"])   # R999 not listed
+
+    def test_autobuy_prefers_listed_order(self):
+        w, bought = self.make([search(id="a", stores=["R230", "R041", "R055"], auto_buy=True)])
+        w.sweep()
+        self.assertEqual(bought, [("a", "R041")])
+
+    def test_group_pauses_all_and_orders_once(self):
+        a = search(id="a", stores=["R041"], auto_buy=True, group="iphone", max_orders=None)
+        b = search(id="b", stores=["R055"], auto_buy=True, group="iphone", max_orders=None)
+        c = search(id="c", stores=["R999"], auto_buy=True, max_orders=None)         # not in the group
+        w, bought = self.make([a, b, c])
+        w.sweep()
+        self.assertEqual(bought, [("a", "R041"), ("c", "R999")])                   # b never orders
+        self.assertEqual(len(w.fetch.urls), 2)                                    # b didn't even check
+        self.assertTrue(a.paused and b.paused)
+        self.assertFalse(c.paused)
+        b.paused = False                                                          # resumed by hand
+        self.assertFalse(limits.check(w.settings, w.state, b).allowed)            # group already ordered
+
+    def test_real_pause_stops_group_mid_sweep(self):
+        a = search(id="a", stores=["R041"], auto_buy=True, group="g", max_orders=None)
+        b = search(id="b", stores=["R055"], auto_buy=True, group="g", max_orders=None)
+        w, bought = self.make([a, b])
+        w.settings.save()
+        del w._pause                      # use the real one, which reloads the config file
+        w.sweep()
+        self.assertEqual(len(w.fetch.urls), 1)
+        self.assertTrue(all(x.paused for x in Settings.load().searches))
+
+    def test_missing_listed_store_warns(self):
+        w, _ = self.make([search(id="a", stores=["R041", "R132"])])
+        with self.assertLogs("rfp", level="WARNING") as cm:
+            w.sweep()
+        self.assertTrue(any("R132" in m for m in cm.output))
+
+
 class LimitsTests(unittest.TestCase):
     def test_decision(self):
         s = Settings()

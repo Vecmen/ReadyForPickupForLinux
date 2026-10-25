@@ -52,6 +52,12 @@ class Search:
     auto_buy_nearby: bool = False   # also accept a nearby store, not just `store`
     max_price: float | None = None  # this search's cap on one order's total
     max_orders: int | None = 1      # orders this search may place before it pauses
+    # Watch (and auto-buy at) exactly these stores, best first. They must be
+    # among the stores Apple returns for `store`'s location (`rfp nearby`).
+    stores: list[str] = field(default_factory=list)
+    # Searches sharing a group stop together: once any of them places an
+    # order, every search in the group pauses and the group orders no more.
+    group: str = ""
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
 
     @property
