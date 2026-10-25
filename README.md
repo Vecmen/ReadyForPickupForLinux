@@ -1,6 +1,39 @@
-# ReadyForPickup
+# ReadyForPickup for Linux
 
-ReadyForPickup — a macOS app that watches Apple Store pickup availability for iPhone and Mac and alerts you when your configuration is ready nearby.
+ReadyForPickup — a macOS app that watches Apple Store pickup availability for iPhone and Mac and alerts you when your configuration is ready nearby. This fork adds a Linux version.
+
+## This Linux fork
+
+This is a fork of [wehbs/ReadyForPickup](https://github.com/wehbs/ReadyForPickup). It adds a Linux version in [`linux/`](linux/README.md); the macOS and iOS apps are untouched, and everything below this section describes them.
+
+**Same as the original**
+- Watches the same models at the same stores in the same 15 countries, using the same bundled store list and product catalog
+- Uses the same Apple pickup endpoint, the same request budget (about 30 requests per 94 minutes) and the same backoff when Apple throttles
+- Alerts only when a model you want *newly* comes in stock, by desktop notification and Pushover
+
+**What's different**
+- **Runs on Linux.** A command-line tool (`rfp`) and a systemd service replace the macOS window. There's a PKGBUILD for Arch and an install script for Ubuntu 22.04+ with GNOME, suited to a VM left running.
+- **Auto-order.** When a preferred model appears, it can add it to your bag and check out for in-store pickup with your Apple account. Two-factor works normally, and your Apple ID and card stay in the system keyring. By default it stops on the final page for you to press Place Order.
+- **Limits.** You cap how many orders it may place, overall and per search, how much one order may cost, and your total spending. It won't place an order over the limit and tells you when a limit is reached.
+- **Safe failure.** If any checkout step fails, it alerts you and leaves the browser mid-checkout for you to finish, so the item isn't lost.
+- **Unattended running.** Config changes apply without a restart, and it warns you when your Apple sign-in expires, before a drop rather than during one.
+
+**Install**
+
+```sh
+git clone https://github.com/Vecmen/ReadyForPickupForLinux
+cd ReadyForPickupForLinux/linux
+makepkg -si                  # Arch
+./ubuntu/install.sh          # Ubuntu (run as your normal user)
+```
+
+Then follow [`linux/README.md`](linux/README.md) to add a search, set up Pushover, sign in to Apple and set your limits.
+
+Auto-order drives Apple's website, which changes without notice. Run `rfp buy --search <id> --dry-run` before relying on it. Apple's Sales Policy limits quantities and lets Apple cancel orders it believes are automated or for resale.
+
+Licensed under GPL-3.0, like the original.
+
+## The original macOS app
 
 ![ReadyForPickup watching iPhone 18 Pro pickup at Apple Fifth Avenue and nearby New York stores, with two models marked as preferred](docs/screenshot.png)
 
@@ -11,10 +44,6 @@ ReadyForPickup — a macOS app that watches Apple Store pickup availability for 
 ## Native iOS companion
 
 A native SwiftUI companion for iPhone and iPad is available in [`ios/`](ios/README.md). It supports iOS 17 or later and builds locally in Xcode. See the iOS guide for setup, verification flows, and the limitations of background inventory checks.
-
-## Linux port (Arch and Ubuntu)
-
-A command-line and systemd version for Arch and Ubuntu, with optional auto-order and spending limits through your Apple account, is in [`linux/`](linux/README.md).
 
 ## About this fork
 

@@ -14,7 +14,7 @@ for both apps.
 ## Install on Arch
 
 ```sh
-git clone https://github.com/wehbs/ReadyForPickup && cd ReadyForPickup/linux
+git clone https://github.com/Vecmen/ReadyForPickupForLinux && cd ReadyForPickupForLinux/linux
 makepkg -si                     # installs /usr/bin/rfp and the systemd user unit
 ```
 
@@ -33,13 +33,18 @@ Without installing: `cd linux && python -m rfp --help`.
 
 ## Install on Ubuntu (22.04+, GNOME), e.g. a VM left running
 
-Copy the whole `ReadyForPickup` folder to the VM (the installer needs
-`ReadyForPickup/*.json` next to `linux/`), then, as your normal desktop user:
+On the VM, as your normal desktop user:
 
 ```sh
-cd ReadyForPickup/linux/ubuntu
+sudo apt install -y git
+git clone https://github.com/Vecmen/ReadyForPickupForLinux
+cd ReadyForPickupForLinux/linux/ubuntu
 ./install.sh                 # or ./install.sh --no-autobuy for alerts only
 ```
+
+(The installer needs the whole repository, not just `linux/`: the store list
+and product catalog live in `ReadyForPickup/`.) To update later:
+`git pull && ./install.sh` in the same folder.
 
 It installs the apt packages it needs (sudo), puts the app in
 `~/.local/share/readyforpickup/venv`, downloads Playwright's Chromium (Ubuntu's
