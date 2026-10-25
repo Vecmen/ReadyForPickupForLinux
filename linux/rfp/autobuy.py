@@ -26,6 +26,7 @@ import json
 import logging
 import re
 import shutil
+import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -110,7 +111,29 @@ def open_context(pw, settings: Settings, headless: bool | None = None):
     exe = find_browser(settings.autobuy.browser_executable)
     if exe:
         kwargs["executable_path"] = exe
-    return pw.chromium.launch_persistent_context(str(BROWSER_PROFILE), **kwargs)
+    # Don't announce automation (the "controlled by automated software" flag
+    # that sites such as Apple's sign-in react to).
+    kwargs["ignore_default_args"] = ["--enable-automation"]
+    ctx = pw.chromium.launch_persistent_context(str(BROWSER_PROFILE), **kwargs)
+    if kwargs["headless"]:
+        # Headless Chromium calls itself "HeadlessChrome"; present as Chrome.
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        ua = page.evaluate("navigator.userAgent")
+        if "HeadlessChrome" in ua:
+            ua = ua.replace("HeadlessChrome", "Chrome")
+            ctx.set_extra_http_headers({"User-Agent": ua})
+            ctx.add_init_script(f"Object.defineProperty(navigator, 'userAgent', {{get: () => {json.dumps(ua)}}});")
+    return ctx
+
+
+def browser_executable(settings: Settings) -> str:
+    """The browser binary auto-buy uses (Playwright's own Chromium for "bundled")."""
+    exe = find_browser(settings.autobuy.browser_executable)
+    if exe:
+        return exe
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as pw:
+        return pw.chromium.executable_path
 
 
 class CheckoutFlow:
@@ -527,41 +550,99 @@ def purchase(search: Search, store_number: str, store_name: str, sku: str, setti
     return result
 
 
-def interactive_login(settings: Settings, country_code: str) -> bool:
-    """Open the store's account page and wait for the user to sign in."""
-    _require_playwright()
-    from playwright.sync_api import sync_playwright
+def _free_port() -> int:
+    import socket
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
 
+
+def _tab_urls(port: int) -> list[str] | None:
+    """URLs of the browser's open tabs, read from its local debugging endpoint
+    (this lists tabs without attaching to or controlling any page)."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=2) as r:
+            return [t.get("url", "") for t in json.loads(r.read()) if t.get("type") == "page"]
+    except Exception:
+        return None
+
+
+def _close_browser(port: int) -> None:
+    """Ask the browser to shut down cleanly, so it saves its cookies to disk."""
+    from playwright.sync_api import sync_playwright
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+            browser.new_browser_cdp_session().send("Browser.close")
+    except Exception as e:   # already closing, or gone
+        log.debug("browser close: %s", e)
+
+
+def interactive_login(settings: Settings, country_code: str, timeout_minutes: int = 15) -> bool:
+    """Sign in through a plain browser window, then confirm the sign-in stuck.
+
+    The window is the auto-buy browser and profile, but started normally,
+    not under automation: Apple's sign-in can accept the password and then
+    never finish loading in a browser it sees being remote-controlled. It
+    closes by itself once the account page stays loaded.
+    """
+    _require_playwright()
     c = data.country(country_code)
-    with sync_playwright() as pw:
-        ctx = open_context(pw, settings, headless=False)
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        flow = CheckoutFlow(page, c, "", "", "", settings, dry_run=True)
-        if flow.signed_in():
-            print("Already signed in.")
-            ctx.close()
-            return True
-        print("Sign in to your Apple account in the browser window (tick 'Trust' if asked). "
-              "Waiting up to 10 minutes...")
-        end = time.time() + 600
-        ok = False
-        while time.time() < end and not page.is_closed():
-            if flow.stage() != "signin":
-                ok = True
-                break
-            page.wait_for_timeout(1000)
-        if ok:
-            page.wait_for_timeout(2000)   # let Apple set its cookies
-        ctx.close()
-        return ok
+    sel = load_selectors()
+    exe = browser_executable(settings)
+    BROWSER_PROFILE.mkdir(parents=True, exist_ok=True)
+    port = _free_port()
+    print("A browser window is opening. Sign in to your Apple account there (tick 'Trust' if asked).\n"
+          "It closes by itself once your account page has loaded.")
+    # Same storage and sandbox settings Playwright starts the browser with:
+    # --password-store=basic so the automated runs can read the cookies this
+    # window saves, --no-sandbox because Ubuntu 24.04 blocks Chromium's
+    # sandbox for browsers without an AppArmor profile (Playwright's build).
+    proc = subprocess.Popen([exe, f"--user-data-dir={BROWSER_PROFILE}", "--password-store=basic", "--no-sandbox",
+                             f"--remote-debugging-port={port}", "--no-first-run", "--no-default-browser-check",
+                             c.url("shop/account/home")],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    started = time.time()
+    end = started + timeout_minutes * 60
+    steady = 0          # seconds the account page has stayed up
+    signed_in_seen = False
+    while time.time() < end and proc.poll() is None:
+        urls = _tab_urls(port) or []
+        on_account = any("/shop/account" in u and not re.search(sel["stage_url_patterns"]["signin"], u, re.I)
+                         for u in urls)
+        steady = steady + 1 if on_account else 0
+        if steady >= 4:                     # stayed on the account page: signed in
+            signed_in_seen = True
+            print("Signed in; closing the window...")
+            _close_browser(port)
+            break
+        time.sleep(1)
+    try:
+        proc.wait(20)
+    except subprocess.TimeoutExpired:
+        if not signed_in_seen:
+            print(f"Still not signed in after {timeout_minutes} minutes; closing the window.")
+        _close_browser(port)
+        try:
+            proc.wait(10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    if not signed_in_seen and time.time() - started < 5:
+        print("The browser closed straight away. Another ReadyForPickup browser window may be using the "
+              "profile (a checkout, or an earlier login): close it, or run "
+              "`systemctl --user stop readyforpickup` for a moment, and try again.")
+        return False
+    print("Checking the sign-in...")
+    return session_status(settings, country_code, headless=False)
 
 
-def session_status(settings: Settings, country_code: str) -> bool:
+def session_status(settings: Settings, country_code: str, headless: bool = True) -> bool:
     _require_playwright()
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as pw:
-        ctx = open_context(pw, settings, headless=True)
+        ctx = open_context(pw, settings, headless=headless)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         ok = CheckoutFlow(page, data.country(country_code), "", "", "", settings, True).signed_in()
         ctx.close()

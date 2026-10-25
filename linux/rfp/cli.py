@@ -374,7 +374,11 @@ def cmd_notify_test(a, s):
 def cmd_account_login(a, s):
     from rfp import autobuy
     ok = autobuy.interactive_login(s, a.country)
-    print("signed in; session saved in the ReadyForPickup browser profile" if ok else "not signed in")
+    if ok:
+        print("Signed in. Auto-buy will use this session.")
+    else:
+        print("Not signed in. If the Apple page accepted your password but kept loading, wait for your "
+              "account page before closing the window. `rfp -v account login` shows more detail.")
     return 0 if ok else 1
 
 

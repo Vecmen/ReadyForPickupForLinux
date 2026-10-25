@@ -39,10 +39,16 @@ def make_handler(store: Store):
             self.end_headers()
             self.wfile.write(data)
 
-        def _redirect(self, to):
+        def _redirect(self, to, cookie=None):
             self.send_response(302)
             self.send_header("Location", to)
+            if cookie:
+                self.send_header("Set-Cookie", cookie)
             self.end_headers()
+
+        @property
+        def signed_in(self):   # like Apple: the sign-in lives in a cookie
+            return "rfp_session=1" in (self.headers.get("Cookie") or "")
 
         def do_GET(self):  # noqa: C901 - one branch per page
             u = urllib.parse.urlparse(self.path)
@@ -50,7 +56,7 @@ def make_handler(store: Store):
             p = u.path
 
             if p == "/shop/account/home":
-                if not store.signed_in:
+                if not self.signed_in:
                     return self._redirect("/shop/signIn/account?r=home")
                 return self._send("Account", "Your Account", "<p>Signed in</p>")
             if p.startswith("/shop/signIn"):
@@ -65,10 +71,11 @@ def make_handler(store: Store):
                     <input id="password_text_field" type="password" name="pw">
                     <button id="sign-in" type="submit">Sign In</button></form>""")
             if p == "/idms/login":
-                if q.get("e") and q.get("pw") == "correct-horse":
-                    store.signed_in = True
+                ok = bool(q.get("e")) and q.get("pw") == "correct-horse"
+                store.signed_in = store.signed_in or ok
                 return self._redirect("/shop/checkout?_s=Fulfillment-init" if q.get("r") == "checkout"
-                                      else "/shop/account/home")
+                                      else "/shop/account/home",
+                                      cookie="rfp_session=1; Path=/; Max-Age=86400" if ok else None)
 
             if p.startswith("/shop/product/"):
                 sku = p[len("/shop/product/"):]
@@ -107,7 +114,7 @@ def make_handler(store: Store):
                 return self._send("Bag", f"Your bag total is ${store.total}" if store.bag else "Your bag is empty",
                                   rows + '<a href="/shop/checkout/start"><button data-autom="checkout">Check Out</button></a>')
             if p == "/shop/checkout/start":
-                if not store.signed_in:
+                if not self.signed_in:
                     return self._redirect("/shop/signIn?r=checkout")
                 return self._redirect("/shop/checkout?_s=Fulfillment-init")
 

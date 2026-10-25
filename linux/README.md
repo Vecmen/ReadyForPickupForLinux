@@ -140,6 +140,13 @@ throttled check backs off 2×, 4×, … up to an hour.
    rfp account login
    ```
 
+   This opens an ordinary browser window, not an automated one, because
+   Apple's sign-in can accept your password and then never finish loading in a
+   browser it sees being remote-controlled. The window closes by itself once
+   your account page has loaded, and the terminal says whether it worked. If it
+   says "closed straight away", another ReadyForPickup browser window is using
+   the profile: close it and try again.
+
    Optional, for when that session expires: `rfp account set-credentials`
    stores your Apple ID and password in the keyring so it can sign back in by
    itself; if Apple then asks for a 2FA code, you get an alert and it waits for
