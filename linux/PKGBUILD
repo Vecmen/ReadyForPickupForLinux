@@ -1,0 +1,32 @@
+# Maintainer: you <you@example.com>
+# Builds from this checkout: run `makepkg -si` inside linux/.
+pkgname=readyforpickup
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Watch Apple Store pickup availability for iPhone and Mac, with optional auto-order"
+arch=('any')
+url="https://github.com/wehbs/ReadyForPickup"
+license=('GPL-3.0-only')
+depends=('python' 'libnotify' 'libsecret')
+makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-wheel')
+optdepends=('python-playwright: auto-order (AUR)'
+            'chromium: browser for auto-order'
+            'gnome-keyring: Secret Service keyring for Apple ID, card and Pushover keys'
+            'keepassxc: alternative Secret Service keyring')
+source=()
+
+build() {
+  cd "$startdir"
+  python -m build --wheel --no-isolation --outdir "$srcdir/dist"
+}
+
+check() {
+  cd "$startdir"
+  python -m unittest tests.test_rfp
+}
+
+package() {
+  python -m installer --destdir="$pkgdir" "$srcdir"/dist/*.whl
+  install -Dm644 "$startdir/readyforpickup.service" "$pkgdir/usr/lib/systemd/user/readyforpickup.service"
+  install -Dm644 "$startdir/README.md" "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

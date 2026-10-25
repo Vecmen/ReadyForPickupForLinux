@@ -1,0 +1,66 @@
+{
+  "_comment": "Defaults for rfp/autobuy.py. Each step lists Playwright selectors tried in order; the first visible one is used. Placeholders: {sku} {store_number} {store_name}. To fix a step after Apple changes its pages, copy this file to ~/.config/readyforpickup/checkout_selectors.json and edit only the keys you need; your file's keys replace these.",
+
+  "stage_url_patterns": {
+    "thankyou": "thank-?you|/order/confirmation",
+    "signin": "signin|sign-in|idmsa\\.apple\\.com",
+    "review": "_s=review",
+    "billing": "_s=billing",
+    "pickupcontact": "_s=pickupcontact",
+    "shipping": "_s=shipping",
+    "fulfillment": "_s=fulfillment",
+    "bag": "/shop/bag"
+  },
+  "stage_heading_patterns": {
+    "fulfillment": "(where|how) would you like to get|get your order",
+    "pickupcontact": "who will pick up|pickup details|pickup contact",
+    "billing": "how do you want to pay|payment",
+    "review": "ready to place your order|review your order",
+    "thankyou": "thank you|order is (placed|confirmed)"
+  },
+
+  "apple_id_frame": ["iframe#aid-auth-widget-iFrame", "iframe[src*='idmsa.apple.com']"],
+  "apple_id_email": ["#account_name_text_field", "input[type='email']", "input[name='accountName']"],
+  "apple_id_password": ["#password_text_field", "input[type='password']"],
+  "apple_id_submit": ["#sign-in", "button[type='submit']", "role=button[name=/continue|sign in/i]"],
+  "apple_id_2fa_text": "verification code|two-factor|verify your identity|enter the code",
+  "apple_id_trust": ["role=button[name=/^trust$/i]", "button:has-text('Trust')"],
+  "checkout_signin_button": ["role=button[name=/sign in with apple|^sign in$/i]", "#signIn\\.customerLogin\\.signInButton"],
+
+  "bag_remove_item": ["button[data-autom*='bag-item-remove']", "role=button[name=/^remove/i]"],
+  "bag_quantity": ["select[data-autom*='item-quantity']", "select[name*='quantity' i]"],
+  "bag_checkout": ["button[data-autom='checkout']", "#shoppingCart\\.actions\\.navCheckout", "#shoppingCart\\.actions\\.checkout", "role=button[name=/^check ?out$/i]"],
+
+  "buy_page_choices": [
+    "role=button[name=/^no trade.?in/i]",
+    "text=/^no trade.?in$/i",
+    "role=radio[name=/^(buy|pay in full|full price|one-time payment)/i]",
+    "role=button[name=/^(buy|pay in full|full price)/i]",
+    "role=radio[name=/connect .*carrier later/i]",
+    "role=button[name=/connect .*carrier later/i]",
+    "text=/connect to any carrier later/i",
+    "role=radio[name=/^no applecare/i]",
+    "role=button[name=/^no applecare/i]",
+    "text=/^no applecare/i"
+  ],
+  "buy_page_continue": ["role=button[name=/^continue$/i]"],
+  "add_to_bag": ["button[name='add-to-cart']", "button[data-autom='add-to-cart']", "role=button[name=/^add to bag$/i]"],
+  "added_to_bag_proceed": ["button[name='proceed']", "role=button[name=/^review bag$/i]", "role=link[name=/^review bag$/i]"],
+
+  "pickup_option": ["role=button[name=/pick it up/i]", "role=tab[name=/pick ?up/i]", "text=/i.ll pick it up/i", "label:has-text('Pickup')"],
+  "store_search_link": ["role=button[name=/show (more )?stores|change store|search (for )?a store/i]"],
+  "store_search_input": ["input[data-autom*='storelocator' i]", "input[aria-label*='ZIP' i]", "input[aria-label*='postcode' i]", "input[aria-label*='location' i]", "input[placeholder*='ZIP' i]"],
+  "store_radio": ["input[type='radio'][value='{store_number}']", "label:has-text('{store_name}')", "text=/Apple {store_name}/i"],
+  "pickup_timeslot_select": ["select[data-autom*='pickup-availablewindow' i]", "select[name*='timeSlot' i]", "select[aria-label*='time' i]"],
+  "pickup_date_button": ["[data-autom*='pickup-availabledate'] button:not([disabled])", "button[data-autom*='date']:not([disabled])"],
+  "continue": ["#rs-checkout-continue-button-bottom", "#rs-checkout-continue-button-top", "role=button[name=/^continue( to [a-z ]+)?$/i]"],
+
+  "pay_with_card": ["#checkout\\.billing\\.billingoptions\\.credit", "label:has-text('Credit or Debit Card')", "text=/credit or debit card/i"],
+  "card_number": ["input[autocomplete='cc-number']", "input[id*='cardNumber' i]", "input[name*='cardNumber' i]"],
+  "card_expiration": ["input[autocomplete='cc-exp']", "input[id*='expiration' i]", "input[name*='expiration' i]"],
+  "card_cvv": ["input[autocomplete='cc-csc']", "input[id*='security' i]", "input[name*='cvv' i]", "input[id*='cvv' i]"],
+
+  "order_total": ["[data-autom='bagtotalvalue']", "[data-autom*='total' i]"],
+  "place_order": ["#rs-checkout-continue-button-bottom", "role=button[name=/place (your )?order/i]"],
+  "order_number_pattern": "\\b(W\\d{9,11})\\b"
+}

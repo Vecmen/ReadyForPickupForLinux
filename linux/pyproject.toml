@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "readyforpickup"
+version = "1.0.0"
+description = "Watch Apple Store pickup availability on Linux, with optional auto-order"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "GPL-3.0-only" }
+dependencies = []          # the watcher is standard library only
+
+[project.optional-dependencies]
+autobuy = ["playwright>=1.40"]
+
+[project.scripts]
+rfp = "rfp.cli:main"
+
+[tool.setuptools]
+packages = ["rfp"]
+
+[tool.setuptools.package-data]
+rfp = ["data/*.json", "checkout_selectors.json"]

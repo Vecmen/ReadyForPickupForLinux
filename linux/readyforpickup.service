@@ -1,0 +1,18 @@
+[Unit]
+Description=ReadyForPickup: watch Apple Store pickup availability
+Documentation=file:///usr/share/doc/readyforpickup/README.md
+Wants=network-online.target
+After=network-online.target graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/rfp watch
+Restart=on-failure
+RestartSec=60
+# Auto-order opens a browser window on your desktop, so the service needs
+# DISPLAY / WAYLAND_DISPLAY. Most desktops export them to systemd --user;
+# if yours doesn't, run once per login:
+#   systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XAUTHORITY
+
+[Install]
+WantedBy=default.target
